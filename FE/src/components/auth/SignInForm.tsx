@@ -78,8 +78,9 @@ export default function SignInForm() {
       }
 
       if (String(message).toLowerCase().includes("network error")) {
-        message =
-          "Cannot reach the server. Make sure the backend is running at http://127.0.0.1:8000 and the dev server proxy is active.";
+        message = import.meta.env.DEV
+          ? "Cannot reach the server. Make sure the backend is running at http://127.0.0.1:8000 and the dev server proxy is active."
+          : "Cannot reach the deployed backend server. Please verify that your Railway OSTIMS_DB API is running and that the VITE_API_URL variable is configured correctly.";
       }
 
       setError(message);
