@@ -20,8 +20,15 @@ class ProductController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+        // Single query to get total inventory stock for all products at once (resolving N+1 query problem)
+        $stockSums = DB::table('inventories')
+            ->select('product_id', DB::raw('SUM(quantity) as total_stock'))
+            ->groupBy('product_id')
+            ->pluck('total_stock', 'product_id')
+            ->toArray();
+
         // Attach an `image_url` attribute and bundle info for each product
-        $products->transform(function ($product) {
+        $products->transform(function ($product) use ($stockSums) {
             $product->image_url = $product->image ? Storage::url($product->image) : null;
             $product->is_bundle = $product->bundleItems->isNotEmpty();
             $product->bundle_items = $product->bundleItems->map(function ($bundleItem) {
@@ -35,7 +42,7 @@ class ProductController extends Controller
             
             // Calculate bundle stock based on component products
             if ($product->is_bundle) {
-                $product->calculated_stock = $this->calculateBundleStock($product);
+                $product->calculated_stock = $this->calculateBundleStock($product, $stockSums);
             }
             
             return $product;
@@ -390,7 +397,7 @@ class ProductController extends Controller
      * Calculate available stock for a bundle product based on component products
      * Returns the maximum number of bundles that can be made
      */
-    private function calculateBundleStock($product)
+    private function calculateBundleStock($product, $stockSums = [])
     {
         if (!$product->bundleItems || $product->bundleItems->isEmpty()) {
             return 0;
@@ -406,13 +413,9 @@ class ProductController extends Controller
                 continue;
             }
 
-            // Get the total inventory stock for this product (sum all inventory entries)
-            $availableStock = DB::table('inventories')
-                ->where('product_id', $bundledProduct->id)
-                ->sum('quantity');
+            // Get the total inventory stock for this product from pre-fetched stock sums
+            $availableStock = $stockSums[$bundledProduct->id] ?? 0;
             
-            // Calculate how many bundles can be made with this component
-            // (available stock / quantity needed per bundle)
             $possibleBundles = floor($availableStock / $bundleItem->quantity);
             
             // Track the minimum (bottleneck)

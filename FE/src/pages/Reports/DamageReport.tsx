@@ -237,7 +237,6 @@ export default function DamageReport() {
         eyebrow="Reports"
         title="Damage report"
         description="Stock losses by product, with the action taken for each incident."
-        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Damage report' }]}
         actions={
           <>
             <Button

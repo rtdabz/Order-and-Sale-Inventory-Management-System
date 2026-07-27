@@ -1,38 +1,94 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { FolderPlus, Layers, RefreshCw, Sparkles, Tag } from "lucide-react";
+import PageMeta from "../common/PageMeta";
+import PageHeader from "../common/PageHeader";
 import ComponentCard from "../common/ComponentCard";
+import StatCard from "../ui/card/StatCard";
+import Button from "../ui/button/Button";
 import Label from "./Label";
 import Input from "./input/InputField";
+import CategoryTable from "../tables/BasicTables/CategoryTable";
+import { useCachedQuery } from "../../hooks/useCachedQuery";
+import { useShowSkeleton } from "../../context/AppDataContext";
+import { CacheKeys } from "../../lib/dataCache";
+import { fetchCategories, fetchProducts, RawCategory, RawProduct } from "../../lib/apiResources";
 import api from "../../lib/axios";
 import Swal from 'sweetalert2';
-import CategoryTable from "../tables/BasicTables/CategoryTable";
-import PageMeta from "../common/PageMeta";
 
 export default function Category() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate initial load, set loading to false after component mounts
-    const timer = setTimeout(() => setLoading(false), 100);
-    return () => clearTimeout(timer);
-  }, []);
+  const categoriesQuery = useCachedQuery<RawCategory[]>(
+    CacheKeys.categories,
+    fetchCategories,
+    { refreshEvents: ['categories:refresh'] }
+  );
+
+  const productsQuery = useCachedQuery<RawProduct[]>(
+    CacheKeys.products,
+    fetchProducts,
+    { refreshEvents: ['products:refresh'] }
+  );
+
+  const categories = categoriesQuery.data ?? [];
+  const products = productsQuery.data ?? [];
+
+  const showSkeleton = useShowSkeleton(categoriesQuery.isInitialLoading || productsQuery.isInitialLoading);
+
+  // Compute category statistics for the redesigned header cards
+  const stats = useMemo(() => {
+    if (showSkeleton) return { total: 0, active: 0, topCategory: "—" };
+
+    const total = categories.length;
+
+    // Count how many categories have at least one product
+    const active = categories.filter((cat) => {
+      const catId = cat.id;
+      const catName = cat.category_name || cat.name || "";
+      return products.some(
+        (p) =>
+          (p.category_id && String(p.category_id) === String(catId)) ||
+          (p.category_name && p.category_name.toLowerCase() === catName.toLowerCase())
+      );
+    }).length;
+
+    // Find the category with the most products
+    const productCounts: Record<string, number> = {};
+    products.forEach((p) => {
+      const catName = p.category_name || "Uncategorized";
+      productCounts[catName] = (productCounts[catName] || 0) + 1;
+    });
+
+    let topCategory = "—";
+    let maxCount = 0;
+    Object.entries(productCounts).forEach(([catName, count]) => {
+      if (count > maxCount && catName !== "Uncategorized") {
+        maxCount = count;
+        topCategory = catName;
+      }
+    });
+
+    if (maxCount > 0) {
+      topCategory = `${topCategory} (${maxCount} items)`;
+    }
+
+    return { total, active, topCategory };
+  }, [categories, products, showSkeleton]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!name.trim()) return;
     
     // Check for duplicate category name
-    try {
-      const res = await api.get('/categories');
-      const existingCategories = Array.isArray(res.data) ? res.data : res.data.data || [];
-      const duplicateName = existingCategories.some((cat: any) => {
-        const catName = cat.category_name || cat.name || cat.category || '';
-        return catName.toLowerCase() === name.trim().toLowerCase();
-      });
-      
-      if (duplicateName) {
+    const duplicateName = categories.some((cat) => {
+      const catName = cat.category_name || cat.name || '';
+      return catName.toLowerCase() === name.trim().toLowerCase();
+    });
+    
+    if (duplicateName) {
+      try {
         await Swal.fire({
           title: 'Category Already Exists',
           text: `A category named "${name.trim()}" already exists. Please use a different name.`,
@@ -45,25 +101,27 @@ export default function Category() {
             if (container) container.style.zIndex = '200000';
           }
         });
-        return;
+      } catch (e) {
+        // ignore
       }
-    } catch (err) {
-      console.error('Failed to check for duplicate categories:', err);
-      // If check fails, allow user to proceed (backend will validate)
+      return;
     }
     
     setSubmitting(true);
+    setError(null);
     try {
       await api.post("/categories", { category: name.trim() });
       const addedName = name.trim();
       setName("");
-      // notify tables to refresh their data
+      
+      // refresh categories query and notify other tables
+      categoriesQuery.refresh();
       window.dispatchEvent(new CustomEvent("categories:refresh"));
+      
       try {
-        // small success toast used across the app
         await Swal.fire({
           title: 'Category added',
-          text: `${addedName || 'Category'} was added successfully.`,
+          text: `${addedName} was added successfully.`,
           icon: 'success',
           showConfirmButton: false,
           timer: 1300,
@@ -84,74 +142,116 @@ export default function Category() {
     }
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([categoriesQuery.refresh(), productsQuery.refresh()]);
+    window.dispatchEvent(new CustomEvent("categories:refresh"));
+  };
+
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      <PageMeta
+    <>
+      <PageMeta title="Categories" />
+
+      <PageHeader
+        eyebrow="Catalog"
         title="Categories"
+        description="Organize your product catalog into groups for POS filtering and reporting."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            loading={categoriesQuery.isRefreshing || productsQuery.isRefreshing}
+            startIcon={<RefreshCw className="h-4 w-4" />}
+          >
+            Refresh
+          </Button>
+        }
       />
-      {/* Left: small fixed-width form on large screens */}
-      <div className="w-full lg:w-80">
-        <ComponentCard title={loading ? "" : "Add New Category"}>
-          {loading ? (
-            <div className="grid grid-cols-1 gap-6">
-              <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
-              <div>
-                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-              </div>
-              <div>
-                <hr />
-                <div className="flex justify-end mt-4">
-                  <div className="h-9 w-28 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6">
-              <div>
-                <Label htmlFor="categoryName">Category Name</Label>
-                <Input
-                  type="text"
-                  id="categoryName"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Biscuit"
-                />
-              </div>
 
-              <div>
-                <hr />
-                <div className="flex justify-end mt-4">
-                  <button
+      <div className="space-y-6">
+        {/* Top: Premium KPI Statistics Section */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Total Categories"
+            tone="brand"
+            icon={<Layers className="h-5 w-5" />}
+            value={showSkeleton ? "..." : stats.total}
+            hint="All groups in system"
+          />
+          <StatCard
+            label="Active Categories"
+            tone="success"
+            icon={<Sparkles className="h-5 w-5" />}
+            value={showSkeleton ? "..." : stats.active}
+            hint="With active products"
+          />
+          <StatCard
+            label="Top Category"
+            tone="violet"
+            icon={<Tag className="h-5 w-5" />}
+            value={showSkeleton ? "..." : stats.topCategory}
+            hint="Most catalog items"
+          />
+        </div>
+
+        {/* Bottom split: form and categories list */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Left form card */}
+          <div className="lg:col-span-4">
+            <ComponentCard 
+              title="Add New Category" 
+              desc="Enter a name to create a new product group."
+            >
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <Label htmlFor="categoryName">Category Name</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      type="text"
+                      id="categoryName"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Rice Meals, Drinks"
+                      className="pr-10"
+                    />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                      <Tag className="h-4 w-4 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-lg bg-red-50 p-3 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                    {error}
+                  </div>
+                )}
+
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
+                  <Button
                     type="submit"
-                    className="inline-flex items-center gap-2 justify-center rounded-lg border border-transparent bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    disabled={submitting}
+                    className="w-full justify-center"
+                    loading={submitting}
+                    disabled={!name.trim()}
+                    startIcon={<FolderPlus className="h-4 w-4" />}
                   >
-                    {submitting ? "Adding..." : "Add category"}
-                  </button>
+                    Add Category
+                  </Button>
                 </div>
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-            </form>
-          )}
-        </ComponentCard>
-      </div>
+              </form>
+            </ComponentCard>
+          </div>
 
-      {/* Right: Categories Table from shared tables */}
-      <div className="flex-1">
-        <ComponentCard title={loading ? "" : "Categories"}>
-          {loading ? (
-            <div className="p-4">
-              <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+          {/* Right list/table card */}
+          <div className="lg:col-span-8">
+            <ComponentCard 
+              title="Manage Categories"
+              desc="View, edit, and audit categories in the system."
+            >
               <CategoryTable />
-            </div>
-          ) : (
-            <div className="p-4">
-              <CategoryTable />
-            </div>
-          )}
-        </ComponentCard>
+            </ComponentCard>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

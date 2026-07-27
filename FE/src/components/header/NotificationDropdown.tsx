@@ -77,9 +77,19 @@ export default function NotificationDropdown() {
       }
     };
     loadLowStock();
+
+    // Listen to real-time events from POS checkout and stock updates
+    window.addEventListener('products:refresh', loadLowStock);
+    window.addEventListener('sale:recorded', loadLowStock);
+
     // refresh periodically while dropdown closed
     const id = setInterval(loadLowStock, 30_000);
-    return () => { mounted = false; clearInterval(id); };
+    return () => { 
+      mounted = false; 
+      clearInterval(id); 
+      window.removeEventListener('products:refresh', loadLowStock);
+      window.removeEventListener('sale:recorded', loadLowStock);
+    };
   }, [acknowledged]);
 
   useEffect(() => {

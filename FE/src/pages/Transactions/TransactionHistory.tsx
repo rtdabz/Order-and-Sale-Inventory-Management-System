@@ -188,7 +188,6 @@ export default function TransactionHistory() {
         eyebrow="Sales"
         title="Transactions"
         description="Every completed sale, searchable by transaction number or date."
-        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Transactions' }]}
         actions={
           <Button
             variant="outline"

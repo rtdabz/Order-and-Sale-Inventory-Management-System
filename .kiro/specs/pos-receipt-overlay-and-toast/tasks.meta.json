@@ -1,0 +1,200 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create `FE/src/components/ui/portal/Portal.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127729086
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127749086
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127875228
+      }
+    ],
+    "2.1 Portal the returned tree in `FE/src/components/ui/modal/index.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127729329
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127885741
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128665359
+      }
+    ],
+    "3.1 Portal, overlay hygiene, scroll lock and Escape in `FE/src/components/pos/ReceiptModal.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127729563
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127887423
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128666563
+      }
+    ],
+    "3.2 Header strip and footer action bar in `FE/src/components/pos/ReceiptModal.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127729759
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128677897
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128966441
+      }
+    ],
+    "4.1 Remove the print control from the paper in `FE/src/components/common/OrderReceipt.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127729957
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128987432
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129305001
+      }
+    ],
+    "4.2 Compact layout, change-due callout and conditional rows in `FE/src/components/common/OrderReceipt.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127730835
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129312896
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129469060
+      }
+    ],
+    "5.1 Success toast fired with the receipt": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127731006
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127888418
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128667853
+      }
+    ],
+    "5.2 Error path onto the toast channel": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127731230
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128678930
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128974169
+      }
+    ],
+    "6.1 Run type checking and the production build": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127731545
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129477238
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129694128
+      }
+    ],
+    "1. Shared Portal primitive": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785127875498
+      }
+    ],
+    "2. Route the shared Modal through the portal": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128665474
+      }
+    ],
+    "3. Receipt overlay shell": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128971598
+      }
+    ],
+    "5. Checkout notifications in `FE/src/components/pos/PosCart.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785128974974
+      }
+    ],
+    "4. Receipt paper": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129469151
+      }
+    ],
+    "6. Build checkpoint": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129694234
+      }
+    ]
+  }
+}

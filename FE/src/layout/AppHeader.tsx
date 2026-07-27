@@ -1,94 +1,118 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 
-import { useSidebar } from "../context/SidebarContext";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
+import BrandLockup from "../components/shell/BrandLockup";
+import BreadcrumbTrail from "../components/shell/BreadcrumbTrail";
+import HeaderQuickActions from "../components/shell/HeaderQuickActions";
+import IconButton from "../components/shell/IconButton";
+import { useSidebar } from "../context/SidebarContext";
+import { SHELL_ICON_CLASS, SHELL_ICON_STROKE } from "../lib/shellTokens";
+import { cn } from "../lib/utils";
 
 /**
  * Top bar for the authenticated shell.
  *
- * Sales are completed at the terminal, so there is nothing to poll for here —
- * no incoming-order queue and no arrival chime.
+ * A layout file: it arranges seven named regions in DOM order and owns nothing
+ * else (Requirement 7.3). Sales are completed at the terminal, so there is
+ * nothing to poll for here — no incoming-order queue and no arrival chime.
+ *
+ * A bare `header` not nested inside another landmark exposes `banner`
+ * implicitly, so it carries no `role` (Requirements 7.7, 12.2).
+ *
+ * `z-30` is the middle of the shell's stacking order — page content `z-auto` <
+ * header `z-30` < backdrop `z-40` < sidebar `z-50` — so the drawer covers the
+ * header on mobile while the header still covers sticky table headers inside
+ * pages. The former `z-99999` broke the first of those.
  */
-const AppHeader: React.FC = () => {
-  const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-  const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+const HEADER_SHELL = cn(
+  "sticky top-0 z-30 flex h-14 w-full items-center gap-2 px-3 lg:px-5",
+  "bg-white/95 dark:bg-gray-900/95 backdrop-blur-md",
+  "border-b border-gray-200 dark:border-gray-800"
+);
 
+const AppHeader: React.FC = () => {
+  const {
+    railState,
+    viewport,
+    isDrawerOpen,
+    toggleRef,
+    toggleSidebar,
+    openDrawer,
+    closeDrawer,
+  } = useSidebar();
+
+  const isMobile = viewport === "mobile";
+
+  /**
+   * One control, two meanings, resolved from the context's viewport band — no
+   * width measurement and no breakpoint literal here.
+   */
   const handleToggle = () => {
-    if (window.innerWidth >= 991) toggleSidebar();
-    else toggleMobileSidebar();
+    if (!isMobile) {
+      toggleSidebar();
+      return;
+    }
+    if (isDrawerOpen) closeDrawer();
+    else openDrawer();
   };
 
+  /**
+   * The name always names the target action, and it differs between the two
+   * meanings of the control (Requirements 1.6, 1.7).
+   */
+  const toggleLabel = isMobile
+    ? isDrawerOpen
+      ? "Close navigation"
+      : "Open navigation"
+    : railState === "expanded"
+      ? "Collapse sidebar"
+      : "Expand sidebar";
+
+  /** Lucide glyphs — no hand-written SVG path markup here (Requirement 4.7). */
+  const ToggleGlyph = isMobile
+    ? isDrawerOpen
+      ? X
+      : Menu
+    : railState === "expanded"
+      ? PanelLeftClose
+      : PanelLeftOpen;
+
   return (
-    <header className="sticky top-0 z-99999 flex w-full border-gray-200 bg-white lg:border-b">
-      <div className="flex flex-grow flex-col items-center justify-between lg:flex-row lg:px-6">
-        <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
-          <button
-            className="z-99999 items-center justify-center h-10 w-10 rounded-lg border-gray-200 text-gray-500 lg:flex lg:h-11 lg:w-11 lg:border"
-            onClick={handleToggle}
-            aria-label="Toggle sidebar"
-          >
-            {isMobileOpen ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
-                  fill="currentColor"
-                />
-              </svg>
-            ) : (
-              <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z"
-                  fill="currentColor"
-                />
-              </svg>
-            )}
-          </button>
+    <header className={HEADER_SHELL}>
+      {/* 1. Sidebar toggle. `toggleRef` lands on the button itself, so closing
+             the drawer with Escape returns focus here (Requirement 1.9). No
+             responsive visibility class (Requirement 7.4). */}
+      <IconButton
+        label={toggleLabel}
+        onClick={handleToggle}
+        buttonRef={toggleRef}
+        aria-expanded={railState === "expanded"}
+        aria-controls="app-sidebar"
+      >
+        <ToggleGlyph
+          className={SHELL_ICON_CLASS}
+          strokeWidth={SHELL_ICON_STROKE}
+          aria-hidden="true"
+        />
+      </IconButton>
 
-          <Link to="/dashboard" className="flex items-center gap-3 lg:hidden">
-            <img
-              className="rounded-lg dark:hidden"
-              src="/images/logo/MKB.jpg"
-              alt="MKB logo"
-              width={50}
-              height={50}
-            />
-            <span className="text-2xl font-semibold text-gray-800">MKB</span>
-          </Link>
+      {/* 2. Brand, mobile only — the rail carries it at `md` and up. */}
+      <BrandLockup showWordmark={false} className="shrink-0 md:hidden" />
 
-          <button
-            onClick={() => setApplicationMenuOpen((open) => !open)}
-            aria-label="Toggle header menu"
-            aria-expanded={isApplicationMenuOpen}
-            className="z-99999 flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 lg:hidden"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M5.99902 10.4951C6.82745 10.4951 7.49902 11.1667 7.49902 11.9951V12.0051C7.49902 12.8335 6.82745 13.5051 5.99902 13.5051C5.1706 13.5051 4.49902 12.8335 4.49902 12.0051V11.9951C4.49902 11.1667 5.1706 10.4951 5.99902 10.4951ZM17.999 10.4951C18.8275 10.4951 19.499 11.1667 19.499 11.9951V12.0051C19.499 12.8335 18.8275 13.5051 17.999 13.5051C17.1706 13.5051 16.499 12.8335 16.499 12.0051V11.9951C16.499 11.1667 17.1706 10.4951 17.999 10.4951ZM13.499 11.9951C13.499 11.1667 12.8275 10.4951 11.999 10.4951C11.1706 10.4951 10.499 11.1667 10.499 11.9951V12.0051C10.499 12.8335 11.1706 13.5051 11.999 13.5051C12.8275 13.5051 13.499 12.8335 13.499 12.0051V11.9951Z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <div
-          className={`${
-            isApplicationMenuOpen ? "flex" : "hidden"
-          } w-full items-center justify-between gap-4 px-5 py-4 shadow-theme-md lg:flex lg:justify-end lg:px-0 lg:shadow-none`}
-        >
-          <div className="flex items-center gap-2 2xsm:gap-3">
-            <NotificationDropdown />
-          </div>
-          <UserDropdown />
-        </div>
+      {/* 3. Page context. Absorbs the slack and truncates, so nothing to its
+             right is pushed off-screen. */}
+      <div className="min-w-0 flex-1">
+        <BreadcrumbTrail />
       </div>
+
+      {/* 5. Quick action — first to degrade (Requirement 7.4). */}
+      <HeaderQuickActions />
+
+      {/* 6, 7. Untouched internals, including the low-stock highlight flow and
+                the logout cache reset (Requirements 7.5, 7.6). */}
+      <NotificationDropdown />
+      <UserDropdown />
     </header>
   );
 };

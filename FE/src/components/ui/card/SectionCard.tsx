@@ -44,11 +44,11 @@ const SectionCard: React.FC<SectionCardProps> = ({
       )}
     >
       {hasHeader && (
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-start gap-3">
             {icon && (
               <span
-                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400"
+                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400"
                 aria-hidden="true"
               >
                 {icon}
@@ -59,7 +59,7 @@ const SectionCard: React.FC<SectionCardProps> = ({
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h2>
               )}
               {description && (
-                <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
               )}
             </div>
           </div>
@@ -68,15 +68,15 @@ const SectionCard: React.FC<SectionCardProps> = ({
       )}
 
       {toolbar && (
-        <div className="border-b border-gray-100 bg-gray-50/60 px-5 py-3 dark:border-gray-800 dark:bg-white/[0.02] sm:px-6">
+        <div className="border-b border-gray-100 bg-gray-50/60 px-4 py-2.5 dark:border-gray-800 dark:bg-white/[0.02] sm:px-5">
           {toolbar}
         </div>
       )}
 
-      <div className={cn(flush ? '' : 'p-5 sm:p-6', bodyClassName)}>{children}</div>
+      <div className={cn(flush ? '' : 'p-4 sm:p-5', bodyClassName)}>{children}</div>
 
       {footer && (
-        <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-4 dark:border-gray-800 dark:bg-white/[0.02] sm:px-6">
+        <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02] sm:px-5">
           {footer}
         </div>
       )}

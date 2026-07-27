@@ -559,7 +559,6 @@ export default function InventoryReport() {
         eyebrow="Reports"
         title="Inventory report"
         description="Track today's stock movement and review historical deliveries."
-        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Inventory report' }]}
         actions={
           <Button
             variant="outline"

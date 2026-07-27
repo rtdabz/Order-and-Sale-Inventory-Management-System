@@ -29,7 +29,22 @@ export default function App() {
   return (
     <OrderProvider>
       <ProductNotificationProvider>
-        <Toaster position="top-right" expand={false} richColors style={{ zIndex: 1000000 }} />
+        <Toaster
+          position="top-right"
+          expand={false}
+          richColors
+          style={{ zIndex: 1000000 }}
+          toastOptions={{
+            className: "rounded-2xl border shadow-lg font-medium text-xs py-3 px-4",
+            classNames: {
+              toast: "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-100 transition-all duration-300",
+              success: "!text-emerald-600 dark:!text-emerald-400 !bg-emerald-50/70 dark:!bg-emerald-950/20 !border-emerald-100/50 dark:!border-emerald-900/30",
+              error: "!text-red-600 dark:!text-red-400 !bg-red-50/70 dark:!bg-red-950/20 !border-red-100/50 dark:!border-red-900/30",
+              warning: "!text-amber-600 dark:!text-amber-400 !bg-amber-50/70 dark:!bg-amber-950/20 !border-amber-100/50 dark:!border-amber-900/30",
+              info: "!text-brand-600 dark:!text-brand-400 !bg-brand-50/70 dark:!bg-brand-950/20 !border-brand-100/50 dark:!border-brand-900/30",
+            }
+          }}
+        />
         <Router>
           <ScrollToTop />
           <Routes>

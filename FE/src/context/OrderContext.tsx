@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { toast } from 'sonner';
+import { toast } from '../lib/toast';
 
 export interface OrderItem {
   id: number;
@@ -108,7 +108,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const maxStock = isTracked ? existingOrder.stock ?? Infinity : Infinity;
 
         if (existingOrder.quantity >= maxStock) {
-          toast.error(`Cannot add more. Only ${maxStock} left in stock.`, { duration: 2000 });
+          toast.error(`Cannot add more. Only ${maxStock} left in stock.`, { duration: 2000, id: `stock-limit-${existingOrder.id}` });
           return currentOrders;
         }
 
@@ -118,14 +118,14 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (added < requested) {
           toast.warning(
             `Only ${added} more ${item.productName} available — ${maxStock} in stock.`,
-            { duration: 2500 }
+            { duration: 2500, id: `stock-limit-${item.id}` }
           );
         } else {
           toast.success(
             added > 1
               ? `Added ${added} × ${item.productName} to your order!`
               : `Added another ${item.productName} to your order!`,
-            { duration: 2000 }
+            { duration: 2000, id: `cart-action-${item.id}` }
           );
         }
 
@@ -138,19 +138,19 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const maxStock = isTracked && typeof item.stock === 'number' ? item.stock : Infinity;
 
       if (maxStock < 1) {
-        toast.error(`Cannot add ${item.productName} — out of stock.`, { duration: 2000 });
+        toast.error(`Cannot add ${item.productName} — out of stock.`, { duration: 2000, id: `out-of-stock-${item.id}` });
         return currentOrders;
       }
 
       const initialQuantity = Math.min(requested, maxStock);
       if (initialQuantity < requested) {
-        toast.warning(`Only ${initialQuantity} ${item.productName} available.`, { duration: 2500 });
+        toast.warning(`Only ${initialQuantity} ${item.productName} available.`, { duration: 2500, id: `stock-limit-${item.id}` });
       } else {
         toast.success(
           initialQuantity > 1
             ? `${initialQuantity} × ${item.productName} added to your order!`
             : `${item.productName} added to your order!`,
-          { duration: 2000 }
+          { duration: 2000, id: `cart-action-${item.id}` }
         );
       }
 
@@ -168,15 +168,15 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
           // Don't allow exceeding stock when increasing (skip for bundles and non-stockable items)
           if (change > 0 && !order.is_bundle && order.is_stockable !== false && typeof order.stock === 'number' && newQuantity > order.stock) {
-            toast.error(`Cannot add more. Only ${order.stock} in stock.`, { duration: 2000 });
+            toast.error(`Cannot add more. Only ${order.stock} in stock.`, { duration: 2000, id: `stock-limit-${order.id}` });
             return order;
           }
 
           // Show toast for quantity updates
           if (change > 0) {
-            toast.success(`Added another ${order.productName}`, { duration: 2000 });
+            toast.success(`Added another ${order.productName}`, { duration: 2000, id: `cart-action-${order.id}` });
           } else if (newQuantity > 1) {
-            toast(`${order.productName} quantity reduced`, { duration: 2000 });
+            toast(`${order.productName} quantity reduced`, { duration: 2000, id: `cart-action-${order.id}` });
           }
 
           return { ...order, quantity: newQuantity };
@@ -215,7 +215,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setOrders(currentOrders => {
       const removed = currentOrders.find(o => o.id === id);
       if (removed) {
-        toast(`${removed.productName} removed from your order`, { duration: 2000 });
+        toast(`${removed.productName} removed from your order`, { duration: 2000, id: `cart-action-${id}` });
       }
       return currentOrders.filter(order => order.id !== id);
     });

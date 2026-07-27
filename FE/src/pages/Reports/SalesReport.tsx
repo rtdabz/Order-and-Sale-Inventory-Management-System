@@ -454,7 +454,6 @@ export default function SalesReport() {
         eyebrow="Reports"
         title="Sales report"
         description="Revenue, orders and items sold grouped by day, week, month or year."
-        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Sales report' }]}
         actions={
           <Button
             variant="outline"

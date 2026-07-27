@@ -10,8 +10,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import Swal from 'sweetalert2';
-import { toast } from 'sonner';
+import { toast } from '../../lib/toast';
 
 import Button from '../ui/button/Button';
 import StatusPill from '../ui/badge/StatusPill';
@@ -172,13 +171,6 @@ const PosCart: React.FC<PosCartProps> = ({ onClose, className }) => {
       invalidateProductData();
       announceSaleRecorded();
 
-      const orderRef = created?.transaction_number || (created?.id ? `#${created.id}` : '');
-      toast.success(
-        orderRef
-          ? `Order ${orderRef} placed successfully!`
-          : 'Order placed successfully!'
-      );
-
       setReceipt({
         orderNumber: created?.transaction_number || `#${created?.id ?? '—'}`,
         items: snapshot.items,
@@ -191,18 +183,26 @@ const PosCart: React.FC<PosCartProps> = ({ onClose, className }) => {
 
       clearOrders();
       resetPayment();
+
+      // Every value comes from `snapshot`: the cart and payment state were just reset.
+      const paymentLabel =
+        PAYMENT_METHODS.find((method) => method.value === snapshot.method)?.label ?? snapshot.method;
+
+      toast.success(`Sale recorded · ${formatCurrency(snapshot.total)}`, {
+        description:
+          snapshot.method === 'cash' && snapshot.change > 0
+            ? `Change due ${formatCurrency(snapshot.change)}`
+            : `Paid by ${paymentLabel}`,
+        // Longer than the default: the receipt overlay competes for attention.
+        duration: 4000,
+      });
+
       setReceiptOpen(true);
     } catch (error: any) {
       console.error('[PosCart] order failed', error);
-      await Swal.fire({
-        title: 'Order failed',
-        text: error?.response?.data?.message || 'Failed to place order. Please try again.',
-        icon: 'error',
-        confirmButtonColor: '#ef4444',
-        willOpen: () => {
-          const container = document.querySelector('.swal2-container') as HTMLElement | null;
-          if (container) container.style.zIndex = '300000';
-        },
+      // Same notification channel as the success path, so both outcomes read the same way.
+      toast.error('Order failed', {
+        description: error?.response?.data?.message || 'Failed to place order. Please try again.',
       });
     } finally {
       setSubmitting(false);

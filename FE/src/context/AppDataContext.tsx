@@ -114,7 +114,10 @@ export function useAppData(): AppDataContextValue {
 export function useShowSkeleton(...loadingStates: boolean[]): boolean {
   const { bootstrapped } = useAppData();
   if (!bootstrapped) return true;
-  return loadingStates.some(Boolean);
+  // Once the session is bootstrapped, we never show page-level skeleton loaders again.
+  // We reference loadingStates to satisfy compiler rules.
+  void loadingStates;
+  return false;
 }
 
 export default AppDataContext;

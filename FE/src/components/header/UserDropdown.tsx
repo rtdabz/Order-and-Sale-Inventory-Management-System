@@ -3,7 +3,7 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNavigate } from "react-router";
 import api from "../../lib/axios";
 import { resetAppData } from "../../context/AppDataContext";
-import { toast } from 'sonner';
+import { toast } from '../../lib/toast';
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);

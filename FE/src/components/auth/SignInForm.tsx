@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { Lock, LogIn, User } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";

@@ -178,11 +178,6 @@ export default function Home() {
             >
               Refresh
             </Button>
-            <Link to="/orderpage">
-              <Button size="sm" startIcon={<ShoppingCart className="h-4 w-4" />}>
-                New sale
-              </Button>
-            </Link>
           </>
         }
       />

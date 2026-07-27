@@ -1,0 +1,416 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create `FE/src/lib/navigation.ts` (Route_Registry)": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129721902
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129732851
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130046746
+      }
+    ],
+    "1.2 Create `FE/src/lib/shellTokens.ts`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129721987
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129733752
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130047292
+      }
+    ],
+    "1.3 Create `FE/src/components/shell/IconButton.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722059
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130055966
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130376426
+      }
+    ],
+    "1.4 Create `FE/src/components/shell/BrandLockup.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722131
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130057517
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130377685
+      }
+    ],
+    "2.1 Rewrite `FE/src/context/SidebarContext.tsx` and update all four consumers in the same change": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722445
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130388922
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130763283
+      }
+    ],
+    "2.2 Extend `FE/src/layout/Backdrop.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722501
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130774368
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131213174
+      }
+    ],
+    "2.3 Create `FE/src/hooks/useDrawerA11y.ts`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722564
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130058516
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130378439
+      }
+    ],
+    "3.1 Create `FE/src/components/shell/NavItem.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722737
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130775897
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131210481
+      }
+    ],
+    "3.2 Create `FE/src/components/shell/NavGroup.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722809
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131232301
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131479959
+      }
+    ],
+    "3.3 Rewrite `FE/src/layout/AppSidebar.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129722914
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131492155
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131830023
+      }
+    ],
+    "4. Checkpoint — sidebar compiles and builds": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723036
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132154891
+      }
+    ],
+    "5.1 Create `FE/src/components/shell/BreadcrumbTrail.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723136
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130777113
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131212115
+      }
+    ],
+    "5.2 Create `FE/src/hooks/useSearchSurface.ts`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723234
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130778439
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131214394
+      }
+    ],
+    "5.3 Create `FE/src/components/shell/SearchTrigger.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723355
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131233004
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131481582
+      }
+    ],
+    "5.4 Create `FE/src/components/shell/SearchOverlay.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723448
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131234457
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131482526
+      }
+    ],
+    "5.5 Create `FE/src/components/shell/HeaderQuickActions.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723534
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130779471
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131215495
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131229774
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131483397
+      }
+    ],
+    "5.6 Rewrite `FE/src/layout/AppHeader.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723627
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131493146
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132124240
+      }
+    ],
+    "6. Checkpoint — shell compiles and builds": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723707
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132156080
+      }
+    ],
+    "7.1 Remove breadcrumbs from `FE/src/components/common/PageHeader.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723791
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132157198
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132351735
+      }
+    ],
+    "7.2 Drop the `breadcrumbs` prop from the seven call sites that pass it": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723869
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132357843
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132747930
+      }
+    ],
+    "7.3 Remove the `New sale` action from `FE/src/pages/Dashboard/Home.tsx`": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129723961
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132358987
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132755603
+      }
+    ],
+    "8. Static verification sweep": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129724151
+      },
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132763627
+      }
+    ],
+    "9. Manual verification checklist — **human-performed, in a browser**": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785129724264
+      }
+    ],
+    "1. Shared foundations": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785130377773
+      }
+    ],
+    "2. Sidebar_Context and content offset": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131213265
+      }
+    ],
+    "3. Sidebar composition": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785131830211
+      }
+    ],
+    "5. Header composition": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132124380
+      }
+    ],
+    "7. `PageHeader` and page call sites": [
+      {
+        "executionId": "d1e8da91-e097-4eaa-b8a6-c6780fc96db1",
+        "chatSessionId": "sess_f485ee27-b603-4de7-bbb4-ebfde925981c",
+        "timestamp": 1785132755697
+      }
+    ]
+  }
+}

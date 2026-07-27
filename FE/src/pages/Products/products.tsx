@@ -26,6 +26,7 @@ import Select from '../../components/form/Select';
 import FileInput from '../../components/form/input/FileInput';
 import ProductTable from '../../components/ProductTable/ProductTable';
 import CreateComboMealModal from '../../components/modals/CreateComboMealModal';
+import { compressImage } from '../../lib/imageCompressor';
 
 import api from '../../lib/axios';
 import { useCachedQuery } from '../../hooks/useCachedQuery';
@@ -221,6 +222,7 @@ export default function Products() {
         willOpen: swalZIndex,
       });
     };
+    let uploadImage: File | null = null;
 
     try {
       try {
@@ -236,7 +238,16 @@ export default function Products() {
       // New products start with no stock so they read as "Out of Stock".
       form.append('status', 'out_of_stock');
       form.append('is_stockable', isStockable ? '1' : '0');
-      if (newImage) form.append('image', newImage);
+      
+      if (newImage) {
+        try {
+          uploadImage = await compressImage(newImage);
+        } catch (e) {
+          console.warn('Image compression failed, using original:', e);
+          uploadImage = newImage;
+        }
+      }
+      if (uploadImage) form.append('image', uploadImage);
 
       await api.post('/products', form);
       await announceSuccess();
@@ -261,13 +272,15 @@ export default function Products() {
 
         if (needsFallback) {
           try {
+            // Find the already compressed uploadImage or fallback to raw
+            const fallbackImage = uploadImage || newImage;
             await api.post('/products', {
               product_name: newName,
               price: newPrice,
               category_id: newCategory,
               status: 'out_of_stock',
               is_stockable: isStockable,
-              image_base64: await fileToDataUrl(newImage),
+              image_base64: await fileToDataUrl(fallbackImage),
             });
             await announceSuccess();
             return;
@@ -328,7 +341,6 @@ export default function Products() {
         eyebrow="Inventory"
         title="Stock management"
         description="Track stock levels, adjust inventory, record damages and manage your catalog."
-        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Stock management' }]}
         actions={
           <>
             <Button

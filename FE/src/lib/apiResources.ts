@@ -154,16 +154,16 @@ export function invalidateOrderData() {
   invalidatePrefix('sales:');
 }
 
-/**
- * Tell the rest of the app a sale was just recorded.
- *
- * The POS runs on one machine, so a plain in-page event is all that is needed —
- * screens subscribe to `sale:recorded` (transactions, dashboard, reports) and
- * `products:refresh` (catalog and stock).
- */
 export function announceSaleRecorded() {
   window.dispatchEvent(new CustomEvent('sale:recorded'));
   window.dispatchEvent(new CustomEvent('products:refresh'));
+  
+  // Pre-warm the cache immediately in the background so navigating to
+  // other pages (like dashboard/transactions) reads fresh data instantly
+  void fetchCompletedOrders();
+  void fetchInventories();
+  void fetchProducts();
+  void fetchOrders();
 }
 
 /** Drop every cached dataset touched by a product or stock change. */

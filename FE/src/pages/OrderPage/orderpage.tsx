@@ -106,6 +106,8 @@ export default function OrderPage() {
   );
 
   const showSkeleton = useShowSkeleton(catalog.isInitialLoading);
+  const showCategoriesSkeleton = useShowSkeleton(categoriesQuery.isInitialLoading);
+  const showBestSellersSkeleton = useShowSkeleton(bestSellersQuery.isInitialLoading);
   const showFeatured = activeCategory === ALL_CATEGORIES && !search.trim();
 
   /** Shared add-to-cart handler for the featured rows. */
@@ -132,7 +134,6 @@ export default function OrderPage() {
         eyebrow="Point of sale"
         title="POS Terminal"
         description="Tap a product to add it, then take payment on the right."
-        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'POS Terminal' }]}
         actions={
           <>
             <Button
@@ -174,7 +175,7 @@ export default function OrderPage() {
               />
             </div>
 
-            {categoriesQuery.isInitialLoading ? (
+            {showCategoriesSkeleton ? (
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: 6 }).map((_, index) => (
                   <Skeleton key={index} className="h-9 w-24 rounded-full" />
@@ -212,7 +213,7 @@ export default function OrderPage() {
               description="Your fastest-moving items"
               icon={<Flame className="h-4 w-4" />}
             >
-              {showSkeleton || bestSellersQuery.isInitialLoading ? (
+              {showSkeleton || showBestSellersSkeleton ? (
                 <div className="flex gap-3 overflow-hidden">
                   {Array.from({ length: 5 }).map((_, index) => (
                     <Skeleton key={index} className="h-64 w-44 shrink-0 rounded-2xl" />

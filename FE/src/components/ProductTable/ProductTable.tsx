@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import Swal from 'sweetalert2';
 import { ImageOff, PackageSearch } from 'lucide-react';
+import { compressImage } from '../../lib/imageCompressor';
 
 import DataTable from '../ui/table/DataTable';
 import StatusPill, { StatusTone } from '../ui/badge/StatusPill';
@@ -88,7 +89,6 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
   const inventories = inventoriesQuery.data ?? [];
   const categories = categoriesQuery.data ?? [];
 
-  const [imageVersion, setImageVersion] = useState(() => Date.now());
   const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
 
   // Add stock modal
@@ -127,7 +127,6 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
   /** Refresh every consumer of product/stock data. */
   const notifyProductsChanged = useCallback(() => {
     window.dispatchEvent(new CustomEvent('products:refresh'));
-    setImageVersion(Date.now());
   }, []);
 
   // Retry broken images shortly after they fail.
@@ -226,7 +225,8 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
     try {
       await api.post('/inventories', { product_id: stockProduct.id, quantity });
       notifyProductsChanged();
-      await Swal.fire({
+      closeStockModal();
+      Swal.fire({
         title: 'Stock updated',
         text: `Added ${quantity} unit(s) to ${productName(stockProduct)}`,
         icon: 'success',
@@ -235,7 +235,6 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
         timerProgressBar: true,
         willOpen: swalZIndex,
       });
-      closeStockModal();
     } catch (error: any) {
       setStockError(error?.response?.data?.message || error.message || 'Failed to add stock');
     } finally {
@@ -386,7 +385,16 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
       form.append('category_id', String(editCategoryId));
       form.append('status', status);
       form.append('_method', 'PUT');
-      if (editImageFile) form.append('image', editImageFile);
+
+      let uploadImage = editImageFile;
+      if (editImageFile) {
+        try {
+          uploadImage = await compressImage(editImageFile);
+        } catch (e) {
+          console.warn('Image compression failed, using original:', e);
+        }
+      }
+      if (uploadImage) form.append('image', uploadImage);
 
       try {
         await api.post(`/products/${id}`, form);
@@ -410,7 +418,7 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
               price: String(editPrice),
               category_id: String(editCategoryId),
               status,
-              image_base64: await fileToDataUrl(editImageFile),
+              image_base64: await fileToDataUrl(uploadImage || editImageFile),
               _method: 'PUT',
             });
           } else {
@@ -423,7 +431,7 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
 
       notifyProductsChanged();
       closeEditModal();
-      await Swal.fire({
+      Swal.fire({
         title: 'Product updated',
         text: `${editName || 'Product'} was updated successfully.`,
         icon: 'success',
@@ -535,7 +543,7 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
       await api.patch(`/products/${product.id}/archive`);
       notifyProductsChanged();
 
-      await Swal.fire({
+      Swal.fire({
         title: 'Archived',
         text: `"${product.displayName}" has been archived.`,
         icon: 'success',
@@ -563,9 +571,10 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
         header: 'Product',
         cell: ({ row }) => {
           const product = row.original;
+          const version = product.updated_at ? new Date(product.updated_at).getTime() : product.id;
           const source =
             product.image && !failedImageIds.has(product.id)
-              ? `${product.image}${product.image.includes('?') ? '&' : '?'}v=${imageVersion}`
+              ? `${product.image}${product.image.includes('?') ? '&' : '?'}v=${version}`
               : null;
 
           return (
@@ -573,7 +582,7 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
                 {source ? (
                   <img
-                    key={`product-${product.id}-${imageVersion}`}
+                    key={`product-${product.id}-${version}`}
                     src={source}
                     alt={product.displayName}
                     width={40}
@@ -707,7 +716,7 @@ export default function ProductTable({ searchQuery = '' }: { searchQuery?: strin
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [failedImageIds, imageVersion, rows]
+    [failedImageIds, rows]
   );
 
   // --------------------------------------------------- notification highlight

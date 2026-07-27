@@ -1,14 +1,23 @@
 import { useSidebar } from "../context/SidebarContext";
+import { SHELL_TRANSITION } from "../lib/shellTokens";
 
+/**
+ * Drawer scrim, mobile only. Purely decorative — `aria-hidden` keeps it out of
+ * the accessibility tree while the drawer itself owns the modal semantics
+ * (Requirement 1.10).
+ *
+ * `z-40` sits between the header (`z-30`) and the drawer (`z-50`).
+ */
 const Backdrop: React.FC = () => {
-  const { isMobileOpen, toggleMobileSidebar } = useSidebar();
+  const { railState, isDrawerOpen, closeDrawer } = useSidebar();
 
-  if (!isMobileOpen) return null;
+  if (railState !== "drawer" || !isDrawerOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-40 bg-gray-900 bg-opacity-50 lg:hidden"
-      onClick={toggleMobileSidebar}
+      aria-hidden="true"
+      className={`fixed inset-0 z-40 bg-gray-900/50 dark:bg-black/60 lg:hidden ${SHELL_TRANSITION}`}
+      onClick={closeDrawer}
     />
   );
 };

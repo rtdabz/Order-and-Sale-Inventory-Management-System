@@ -91,7 +91,7 @@ const StatCard: React.FC<StatCardProps> = ({
         {badge && <span className="shrink-0">{badge}</span>}
       </div>
 
-      <div className={cn(icon || badge ? 'mt-5' : '')}>
+      <div className={cn(icon || badge ? 'mt-3.5' : '')}>
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           {label}
         </p>
@@ -99,12 +99,12 @@ const StatCard: React.FC<StatCardProps> = ({
         {hint && <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{hint}</p>}
       </div>
 
-      {footer && <div className="mt-4">{footer}</div>}
+      {footer && <div className="mt-3">{footer}</div>}
     </>
   );
 
   const base = cn(
-    'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 dark:border-gray-800 dark:bg-white/[0.03]',
+    'rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 dark:border-gray-800 dark:bg-white/[0.03]',
     styles.ring,
     interactive && 'cursor-pointer text-left hover:-translate-y-0.5 hover:shadow-md',
     className
