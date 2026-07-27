@@ -11,14 +11,23 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('damages', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('product_id')->constrained('products')->onDelete('cascade');
-            $table->integer('quantity');
-            $table->decimal('cost_per_unit', 10, 2)->default(0);
-            $table->text('reason')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('damages')) {
+            Schema::create('damages', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('product_id')->constrained('products')->onDelete('cascade');
+                $table->integer('quantity');
+                $table->decimal('cost_per_unit', 10, 2)->default(0);
+                $table->text('reason')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (!Schema::hasColumn('damages', 'action_taken')) {
+            Schema::table('damages', function (Blueprint $table) {
+                $table->string('action_taken')->nullable()->default('write_off')->after('reason');
+                $table->text('notes')->nullable()->after('action_taken');
+            });
+        }
     }
 
     /**

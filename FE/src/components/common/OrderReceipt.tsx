@@ -1,7 +1,8 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
+import { formatCurrency } from '../../lib/format';
 
-interface OrderItem {
+interface OrderReceiptItem {
   productName: string;
   quantity: number;
   price: number;
@@ -10,78 +11,93 @@ interface OrderItem {
 
 interface OrderReceiptProps {
   orderNumber: string;
-  pcNumber: string;
-  items: OrderItem[];
+  items: OrderReceiptItem[];
   total: number;
   orderDate: string;
   onPrint?: () => void;
   showPrintButton?: boolean;
+  /** Optional payment block, shown when the sale was tendered at the counter. */
+  paymentMethod?: string | null;
+  amountPaid?: number | null;
+  changeDue?: number | null;
+  /** Optional footer note (e.g. "Preview — not yet printed"). */
+  footerNote?: string;
 }
 
+/** 80mm-style sales receipt shown after a POS Terminal checkout. */
 const OrderReceipt: React.FC<OrderReceiptProps> = ({
   orderNumber,
-  pcNumber,
   items,
   total,
   orderDate,
   onPrint,
-  showPrintButton = true
+  showPrintButton = true,
+  paymentMethod,
+  amountPaid,
+  changeDue,
+  footerNote = 'Thank you for your purchase',
 }) => {
+  const itemCount = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const showPayment =
+    !!paymentMethod || (amountPaid !== null && amountPaid !== undefined && amountPaid > 0);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-8 w-[420px] mx-auto border-2 border-gray-300 dark:border-gray-600 shadow-2xl" id="order-receipt">
-      {/* Logo and Header */}
-      <div className="mb-6 pb-3 border-b-2 border-solid border-gray-400 dark:border-gray-700 flex flex-col items-center gap-3">
-        <img 
-          src="/images/logo/MKB.jpg" 
-          alt="MKB Logo" 
+    <div
+      id="order-receipt"
+      className="mx-auto w-[420px] max-w-full rounded-lg border-2 border-gray-300 bg-white p-8 shadow-2xl dark:border-gray-600 dark:bg-gray-800"
+    >
+      {/* Brand header */}
+      <div className="mb-6 flex flex-col items-center gap-3 border-b-2 border-solid border-gray-400 pb-3 dark:border-gray-700">
+        <img
+          src="/images/logo/MKB.jpg"
+          alt="MKB logo"
           style={{ height: '60px', width: '60px' }}
           className="object-contain"
         />
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white tracking-widest">MKB</h1>
-        <p className="text-[10px] text-gray-500 dark:text-gray-400">SALES RECEIPT</p>
+        <h1 className="text-4xl font-bold tracking-widest text-gray-900 dark:text-white">MKB</h1>
+        <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Sales receipt
+        </p>
       </div>
 
-      {/* Header - Station/Type and Date */}
-      <div className="mb-6 pb-4 border-b border-solid border-gray-300 dark:border-gray-700">
-        <div className="grid grid-cols-2 gap-4 text-xs mb-3">
-          <div className="flex justify-between">
-            <span className="text-gray-500 dark:text-gray-400 font-medium">Station:</span>
-            <span className="text-gray-900 dark:text-white font-bold">{pcNumber}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500 dark:text-gray-400 font-medium">Date:</span>
-            <span className="text-gray-900 dark:text-white font-bold">{orderDate}</span>
-          </div>
+      {/* Meta */}
+      <div className="mb-6 space-y-2 border-b border-solid border-gray-300 pb-4 dark:border-gray-700">
+        <div className="flex justify-between text-xs">
+          <span className="font-medium text-gray-500 dark:text-gray-400">Transaction #:</span>
+          <span className="font-bold text-gray-900 dark:text-white">{orderNumber}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-gray-500 dark:text-gray-400 font-medium">Order #:</span>
-          <span className="text-gray-900 dark:text-white font-bold">{orderNumber}</span>
+          <span className="font-medium text-gray-500 dark:text-gray-400">Date:</span>
+          <span className="font-bold text-gray-900 dark:text-white">{orderDate}</span>
         </div>
       </div>
 
-      {/* Items List */}
+      {/* Items */}
       <div className="mb-6">
-        <div className="grid grid-cols-2 gap-4 pb-3 mb-4 border-b border-gray-200 dark:border-gray-700 items-end">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">Product</span>
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 text-right">Amount</span>
+        <div className="mb-4 grid grid-cols-2 items-end gap-4 border-b border-gray-200 pb-3 dark:border-gray-700">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+            Product
+          </span>
+          <span className="text-right text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+            Amount
+          </span>
         </div>
         <div className="space-y-4">
           {items.map((item, index) => (
-            <div key={index} className="space-y-1">
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <p className="text-gray-900 dark:text-white font-semibold text-sm leading-tight">
+            <div key={`${item.productName}-${index}`} className="space-y-1">
+              <div className="grid grid-cols-2 items-center gap-4">
+                <p className="text-sm font-semibold leading-tight text-gray-900 dark:text-white">
                   {item.productName}
                 </p>
-                <span className="text-gray-900 dark:text-white font-bold text-sm tabular-nums text-right">
-                  ₱{(item.price * item.quantity).toFixed(2)}
+                <span className="text-right text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                  {formatCurrency(item.price * item.quantity)}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {item.quantity} × item
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {item.quantity} × {formatCurrency(item.price)}
               </p>
               {item.notes && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 px-2 py-1 rounded">
+                <p className="rounded bg-gray-50 px-2 py-1 text-xs italic text-gray-500 dark:bg-gray-700/50 dark:text-gray-400">
                   {item.notes}
                 </p>
               )}
@@ -90,27 +106,68 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({
         </div>
       </div>
 
-      {/* Total Section */}
-      <div className={`border-t-2 border-solid border-gray-400 dark:border-gray-700 pt-2 ${showPrintButton ? 'mb-6' : 'mb-0'}`}>
-        <div className="flex justify-between items-center">
-          <span className="text-base font-bold uppercase tracking-wide text-gray-800 dark:text-gray-200">Total Amount</span>
-          <span className="text-3xl font-bold text-gray-900 dark:text-white tabular-nums">₱{total.toFixed(2)}</span>
+      {/* Total */}
+      <div className="border-t-2 border-solid border-gray-400 pt-2 dark:border-gray-700">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-gray-500 dark:text-gray-400">Items</span>
+          <span className="font-semibold tabular-nums text-gray-800 dark:text-gray-200">
+            {itemCount}
+          </span>
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-base font-bold uppercase tracking-wide text-gray-800 dark:text-gray-200">
+            Total
+          </span>
+          <span className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
+            {formatCurrency(total)}
+          </span>
         </div>
       </div>
-      
+
+      {/* Payment */}
+      {showPayment && (
+        <div className="mt-4 space-y-2 border-t border-dashed border-gray-300 pt-2 dark:border-gray-700">
+          {paymentMethod && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-gray-500 dark:text-gray-400">Payment</span>
+              <span className="font-semibold uppercase text-gray-800 dark:text-gray-200">
+                {paymentMethod}
+              </span>
+            </div>
+          )}
+          {amountPaid !== null && amountPaid !== undefined && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-gray-500 dark:text-gray-400">Amount tendered</span>
+              <span className="font-semibold tabular-nums text-gray-800 dark:text-gray-200">
+                {formatCurrency(amountPaid)}
+              </span>
+            </div>
+          )}
+          {changeDue !== null && changeDue !== undefined && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-bold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                Change
+              </span>
+              <span className="font-bold tabular-nums text-gray-900 dark:text-white">
+                {formatCurrency(changeDue)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
-      <div className="mt-4 pt-2 border-t border-dashed border-gray-300 dark:border-gray-700 text-center">
-        <p className="text-[8px] text-gray-600 dark:text-gray-400">Thank you for your purchase</p>
+      <div className="mt-4 border-t border-dashed border-gray-300 pt-2 text-center dark:border-gray-700">
+        <p className="text-xs text-gray-500 dark:text-gray-400">{footerNote}</p>
       </div>
 
-      {/* Print Button */}
       {showPrintButton && onPrint && (
         <button
           onClick={onPrint}
-          className="w-full bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#EA580C] hover:to-[#C2410C] text-white font-bold py-3.5 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2.5 shadow-lg hover:shadow-xl uppercase tracking-wide text-sm mt-6 print:hidden"
+          className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-6 py-3.5 text-sm font-bold uppercase tracking-wide text-white shadow-lg transition-all duration-200 hover:bg-brand-600 hover:shadow-xl print:hidden"
         >
-          <Printer className="w-5 h-5" />
-          Print Receipt
+          <Printer className="h-5 w-5" />
+          Print receipt
         </button>
       )}
     </div>

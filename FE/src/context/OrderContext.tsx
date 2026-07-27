@@ -28,7 +28,11 @@ export interface OrderItem {
 
 interface OrderContextType {
   orders: OrderItem[];
-  addToOrder: (item: Omit<OrderItem, 'quantity'>) => void;
+  /**
+   * Add an item to the cart. Pass `quantity` to add several units at once —
+   * the POS grid uses this so a quantity of 5 raises one toast, not five.
+   */
+  addToOrder: (item: Omit<OrderItem, 'quantity'>, quantity?: number) => void;
   updateQuantity: (id: number, change: number) => void;
   updateNotes: (id: number, notes: string) => void;
   updateEggCount: (id: number, count: number) => void;
@@ -92,38 +96,65 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, [sessionId]);
 
-  const addToOrder = (item: Omit<OrderItem, 'quantity'>) => {
+  const addToOrder = (item: Omit<OrderItem, 'quantity'>, quantity: number = 1) => {
+    const requested = Math.max(1, Math.floor(quantity) || 1);
+
     setOrders(currentOrders => {
       const existingOrder = currentOrders.find(order => order.id === item.id);
-      
+
       if (existingOrder) {
-        // If item exists, increment quantity but don't exceed available stock
-        // Check stock for both stockable items AND bundles
-        if (existingOrder.is_stockable !== false || existingOrder.is_bundle) {
-          const maxStock = existingOrder.stock ?? Infinity;
-          if (existingOrder.quantity >= maxStock) {
-            toast.error(`Cannot add more. Only ${maxStock} left in stock.`, { duration: 2000 });
-            return currentOrders;
-          }
+        // Stock is capped for tracked products and for bundles.
+        const isTracked = existingOrder.is_stockable !== false || existingOrder.is_bundle;
+        const maxStock = isTracked ? existingOrder.stock ?? Infinity : Infinity;
+
+        if (existingOrder.quantity >= maxStock) {
+          toast.error(`Cannot add more. Only ${maxStock} left in stock.`, { duration: 2000 });
+          return currentOrders;
         }
 
-        toast.success(`Added another ${item.productName} to your order!`, { duration: 2000 });
+        const nextQuantity = Math.min(existingOrder.quantity + requested, maxStock);
+        const added = nextQuantity - existingOrder.quantity;
+
+        if (added < requested) {
+          toast.warning(
+            `Only ${added} more ${item.productName} available — ${maxStock} in stock.`,
+            { duration: 2500 }
+          );
+        } else {
+          toast.success(
+            added > 1
+              ? `Added ${added} × ${item.productName} to your order!`
+              : `Added another ${item.productName} to your order!`,
+            { duration: 2000 }
+          );
+        }
+
         return currentOrders.map(order =>
-          order.id === item.id
-            ? { ...order, quantity: order.quantity + 1 }
-            : order
+          order.id === item.id ? { ...order, quantity: nextQuantity } : order
         );
       }
-      
-      // If item doesn't exist, add it with quantity 1
-      // Check stock for stockable items and bundles
-      if ((item.is_stockable !== false || item.is_bundle) && typeof item.stock === 'number' && item.stock < 1) {
+
+      const isTracked = item.is_stockable !== false || item.is_bundle;
+      const maxStock = isTracked && typeof item.stock === 'number' ? item.stock : Infinity;
+
+      if (maxStock < 1) {
         toast.error(`Cannot add ${item.productName} — out of stock.`, { duration: 2000 });
         return currentOrders;
       }
 
-      toast.success(`${item.productName} added to your order!`, { duration: 2000 });
-      return [...currentOrders, { ...item, quantity: 1 }];
+      const initialQuantity = Math.min(requested, maxStock);
+      if (initialQuantity < requested) {
+        toast.warning(`Only ${initialQuantity} ${item.productName} available.`, { duration: 2500 });
+      } else {
+        toast.success(
+          initialQuantity > 1
+            ? `${initialQuantity} × ${item.productName} added to your order!`
+            : `${item.productName} added to your order!`,
+          { duration: 2000 }
+        );
+      }
+
+      return [...currentOrders, { ...item, quantity: initialQuantity }];
     });
   };
 

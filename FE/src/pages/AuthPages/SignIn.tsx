@@ -6,7 +6,8 @@ export default function SignIn() {
   return (
     <>
       <PageMeta
-        title="SignIn"
+        title="Sign in · MKB POS"
+        description="Sign in to the MKB point of sale terminal."
       />
       <AuthLayout>
         <SignInForm />

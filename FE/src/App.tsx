@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { Toaster } from "sonner";
+
 import SignIn from "./pages/AuthPages/SignIn";
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
@@ -7,58 +9,53 @@ import ProtectedRoute from "./components/common/ProtectedRoute";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import Products from "./pages/Products/products";
-import Orders from "./pages/Orders/orders";
 import OrderPage from "./pages/OrderPage/orderpage";
-import OrderHistory from "./pages/Orders/order-history";
+import TransactionHistory from "./pages/Transactions/TransactionHistory";
 import SalesReport from "./pages/Reports/SalesReport";
 import DamageReport from "./pages/Reports/DamageReport";
+import InventoryReport from "./pages/Reports/InventoryReport";
+import Category from "./components/form/Category";
 import { OrderProvider } from "./context/OrderContext";
 import { ProductNotificationProvider } from "./context/ProductNotificationContext";
-import Category from "./components/form/Category";
-import { Toaster } from 'sonner';
-import UserOrder from "./pages/user/user_order";
-import InventoryReport from "./pages/Reports/InventoryReport";
 
-
+/**
+ * Route map for the single-terminal POS.
+ *
+ * Every screen sits behind authentication: sales are rung up on the POS
+ * Terminal by staff, so there is no public customer-facing ordering route and
+ * no order queue to review.
+ */
 export default function App() {
   return (
     <OrderProvider>
       <ProductNotificationProvider>
-        <Toaster position="top-right" expand={false} richColors />
+        <Toaster position="top-right" expand={false} richColors style={{ zIndex: 1000000 }} />
         <Router>
           <ScrollToTop />
-        <Routes>
-          {/* Dashboard Layout (requires auth) */}
-          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route index path="/dashboard" element={<Home />} />
+          <Routes>
+            {/* Authenticated application shell */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route index path="/dashboard" element={<Home />} />
 
-            {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
+              <Route path="/orderpage" element={<OrderPage />} />
+              <Route path="/transactions" element={<TransactionHistory />} />
 
-            {/* Forms */}
-            <Route path="/category" element={<Category />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/category" element={<Category />} />
 
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/orderpage" element={<OrderPage />} />
-            <Route path="/order-history" element={<OrderHistory />} />
+              <Route path="/reports/sales" element={<SalesReport />} />
+              <Route path="/inventory" element={<InventoryReport />} />
+              <Route path="/reports/damage" element={<DamageReport />} />
 
-            {/* Tables */}
-            <Route path="/products" element={<Products />} />
-            <Route path="/reports/sales" element={<SalesReport />} />
-            <Route path="/reports/damage" element={<DamageReport />} />
-            <Route path="/inventory" element={<InventoryReport />} />
-          </Route>
+              <Route path="/profile" element={<UserProfiles />} />
+            </Route>
 
-          {/* Auth Layout */}
-          <Route path="/" element={<SignIn />} />
-          
-          {/* Public Route - User Order (no auth required) */}
-          <Route path="/user_order" element={<UserOrder />} />
+            {/* Sign in */}
+            <Route path="/" element={<SignIn />} />
 
-          {/* Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
       </ProductNotificationProvider>
     </OrderProvider>
   );

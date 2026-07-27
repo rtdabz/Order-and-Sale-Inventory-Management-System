@@ -10,8 +10,6 @@ class Order extends Model
     protected $fillable = [
         'order_date',
         'total_amount',
-        'order_alias',
-        'session_id',
         'transaction_number',
     ];
 

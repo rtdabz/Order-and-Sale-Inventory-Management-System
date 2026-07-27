@@ -1,885 +1,712 @@
-import { useEffect, useState } from 'react';
-import PageBreadcrumb from '../../components/common/PageBreadCrumb';
+import { useMemo, useState } from 'react';
+import { ColumnDef } from '@tanstack/react-table';
+import Chart from 'react-apexcharts';
+import { ApexOptions } from 'apexcharts';
+import {
+  BarChart3,
+  CalendarRange,
+  FileDown,
+  FileText,
+  Package,
+  Receipt,
+  RefreshCw,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
+
 import PageMeta from '../../components/common/PageMeta';
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '../../components/ui/table';
+import PageHeader from '../../components/common/PageHeader';
+import SectionCard from '../../components/ui/card/SectionCard';
+import StatCard from '../../components/ui/card/StatCard';
+import SegmentedTabs from '../../components/ui/tabs/SegmentedTabs';
+import DataTable from '../../components/ui/table/DataTable';
+import EmptyState from '../../components/ui/empty/EmptyState';
+import Button from '../../components/ui/button/Button';
+import { Modal } from '../../components/ui/modal';
+import { SkeletonChart, SkeletonStatCards, SkeletonTable } from '../../components/ui/skeleton/Skeleton';
+
 import api from '../../lib/axios';
+import { useCachedQuery } from '../../hooks/useCachedQuery';
+import { useShowSkeleton } from '../../context/AppDataContext';
+import { CacheKeys, fetchCached } from '../../lib/dataCache';
+import { fetchOrders, RawOrder } from '../../lib/apiResources';
+import { downloadCsv, downloadPdfTable } from '../../lib/exportData';
+import {
+  formatCurrency,
+  formatDate,
+  formatNumber,
+  getBusinessDayKey,
+  getWeekStartKey,
+  sumOrderQuantity,
+} from '../../lib/format';
 
-interface OrderItem {
-  id: number;
-  price: number;
-  quantity: number;
-  product_id?: number;
-  product?: {
-    id: number;
-    name?: string;
-    product_name?: string;
-  };
-  product_name?: string;
-  name?: string;
-}
+type ViewMode = 'daily' | 'weekly' | 'monthly' | 'annual';
 
-interface Order {
-  id: number;
-  created_at: string;
-  order_date?: string;
-  total_amount: number;
-  order_items?: OrderItem[];
-  status?: string;
-  sale?: any; // sale relationship - if present, order is completed
-}
-
-// Helper function to get the business day date (resets at 8am, not midnight)
-// Orders from midnight to 8am belong to the previous business day
-const getBusinessDay = (dateStr: string): string => {
-  const d = new Date(dateStr);
-  const hour = d.getHours();
-  
-  // If hour is before 8am, this order belongs to the previous day's business day
-  // Business day runs from 8am to 8am (or 8am to 2am next calendar day if you think of it that way)
-  if (hour < 8) {
-    d.setDate(d.getDate() - 1);
-  }
-  
-  // Format as YYYY-MM-DD
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+type PeriodGroup = {
+  key: string;
+  label: string;
+  /** Weekday name, only meaningful for the daily view. */
+  dayName: string;
+  orders: number;
+  items: number;
+  total: number;
 };
 
-export default function SalesReport() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type MonthlyDetail = { month: number; total_amount: number; order_count: number };
 
-  // filter state (simple date range)
-  const [fromDate, setFromDate] = useState<string | null>(null);
-  const [toDate, setToDate] = useState<string | null>(null);
-  // view mode: group by day / week / month / year
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly' | 'annual'>('daily');
-  // pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  
-  // Annual view state
-  const [annualData, setAnnualData] = useState<Array<{ month: number; total_amount: number; order_count: number }> | null>(null);
-  
-  // Modal state for product details
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalPeriod, setModalPeriod] = useState<{ key: string; label: string } | null>(null);
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
-  useEffect(() => {
-    loadOrders();
-    loadAnnualData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function loadOrders() {
-    setLoading(true);
-    setError(null);
-    try {
-      // Add cache-busting timestamp to force fresh data
-      const res = await api.get(`/orders?_t=${Date.now()}`);
-      const data = Array.isArray(res.data) ? res.data : res.data.data || [];
-      // normalize into the shape we expect and ensure dates
-      const normalized = data.map((o: any) => ({
-        id: o.id,
-        created_at: o.created_at || o.order_date || new Date().toISOString(),
-        order_date: o.order_date || null,
-        total_amount: typeof o.total_amount === 'number' ? o.total_amount : parseFloat(String(o.total_amount || 0)),
-        order_items: o.order_items || o.orderItems || [],
-        status: o.status || (o.sale ? 'Completed' : 'Pending')
-      }));
-
-      setOrders(normalized);
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e.message || 'Failed to load orders');
-    } finally {
-      setLoading(false);
-    }
-
-  }
-
-  async function loadAnnualData() {
-    try {
-      const year = new Date().getFullYear();
-      const res = await api.get(`/sales/monthly-details?year=${year}&_t=${Date.now()}`);
-      if (res && res.data && Array.isArray(res.data.data)) {
-        setAnnualData(res.data.data);
-      }
-    } catch (e: any) {
-      console.error('Failed to load annual data:', e);
-    }
-  }
-
-  const filtered = orders.filter((o: Order) => {
-    if (!fromDate && !toDate) return true;
-    // Use order_date if available, otherwise fall back to created_at
-    const dateStr = o.order_date || o.created_at;
-    const d = dateStr.split('T')[0]; // Extract YYYY-MM-DD
-    
-    // Debug logging
-    if (fromDate || toDate) {
-      console.log('[Filter] Order date:', d, '| From:', fromDate, '| To:', toDate);
-    }
-    
-    // Only include if it's within the range (inclusive on both ends)
-    if (fromDate && d < fromDate) {
-      console.log('[Filter] Excluded:', d, '< fromDate', fromDate);
-      return false;
-    }
-    if (toDate && d > toDate) {
-      console.log('[Filter] Excluded:', d, '> toDate', toDate);
-      return false;
-    }
-    
-    console.log('[Filter] Included:', d);
-    return true;
+const fetchMonthlyDetails = (year: number) =>
+  fetchCached<MonthlyDetail[]>(CacheKeys.monthlySalesDetails(year), async () => {
+    const response = await api.get(`/sales/monthly-details?year=${year}`);
+    return Array.isArray(response?.data?.data) ? response.data.data : [];
   });
 
-  // aggregated values are computed during export/grouping as needed
+const isCompleted = (order: RawOrder) =>
+  Boolean(order.sale) || String(order.status ?? '').toLowerCase() === 'completed';
 
-  const isCompleted = (o: Order) => !!o.sale || String(o.status || '').toLowerCase() === 'completed';
+const orderDateOf = (order: RawOrder) => String(order.order_date || order.created_at || '');
 
+/** Period bucket an order belongs to, for the active view mode. */
+function bucketOf(order: RawOrder, viewMode: ViewMode): { key: string; label: string } {
+  const raw = orderDateOf(order);
+  const dateOnly = raw.split('T')[0];
 
-  async function htmlToPdfAndDownload(html: string, filename: string) {
-    // create container, render HTML and pass to html2pdf
-    const container = document.createElement('div');
-    container.style.padding = '12px';
-    container.style.background = '#fff';
-    container.innerHTML = html;
-    document.body.appendChild(container);
-    try {
-      // dynamic import to avoid static type issues and reduce initial bundle cost
-      const mod = await import('html2pdf.js');
-      const html2pdf = (mod as any).default || mod;
-      await html2pdf()
-        .from(container)
-        .set({
-          margin: 10,
-          filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        })
-        .save();
-    } finally {
-      // cleanup
-      document.body.removeChild(container);
-    }
+  if (viewMode === 'daily') {
+    const key = getBusinessDayKey(raw);
+    const [year, month, day] = key.split('-');
+    return { key, label: `${day}/${month}/${year}` };
   }
-
-
-  async function exportPdfForPeriod(periodKey: string) {
-    // For daily view, periodKey is YYYY-MM-DD; export COMPLETED orders for that business day as a PDF
-    const dayOrders = filtered.filter((o) => {
-      if (!isCompleted(o)) return false;
-      const dateStr = o.order_date || o.created_at;
-      return getBusinessDay(dateStr) === periodKey;
-    });
-    const rowsHtml = dayOrders.map((o) => {
-      // Show only date (DD/MM/YYYY) without time
-      const dateStr = o.order_date || o.created_at;
-      const [year, month, day] = dateStr.split('T')[0].split('-');
-      const formattedDate = `${day}/${month}/${year}`;
-      return `
-      <tr>
-        <td style="padding:10px 14px;border:1px solid #ddd;">#${o.id}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;">${formattedDate}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;text-align:right;">${(o.order_items || []).reduce((s, i) => s + (i.quantity || 0), 0)}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;text-align:right;">&#8369;${(o.total_amount || 0).toFixed(2)}</td>
-      </tr>`;
-    }).join('\n');
-
-    const total = dayOrders.reduce((acc, o) => acc + (o.total_amount || 0), 0);
-
-    const dateRangeText = fromDate || toDate ? `(${fromDate || 'All'} to ${toDate || 'Today'})` : '';
-    const title = `Sales Report - ${periodKey} ${dateRangeText}`;
-    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${title}</title><style>html,body{box-sizing:border-box;height:100%;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:18px}.report-wrapper{padding:10px;background:#fff;margin-top:48px}.report-header{margin-bottom:28px}table{border-collapse:collapse;width:calc(100% - 10px);margin:0 5px;table-layout:auto;border-spacing:0}th,td{padding:10px 14px;border:1px solid #ddd;vertical-align:middle;word-break:break-word}th{background:#f3f4f6;font-weight:700}thead th{text-align:left}tfoot td{font-weight:700}</style></head><body><div class="report-wrapper"><div class="report-header"><h2>${title}</h2><div>Generated: ${new Date().toLocaleString()}</div></div><table><thead><tr><th>Order #</th><th>Date</th><th style="text-align:right;">Items</th><th style="text-align:right;">Total (&#8369;)</th></tr></thead><tbody>${rowsHtml}<tr><td style="font-weight:700;padding:10px 14px;border:1px solid #ddd;">Totals</td><td style="padding:10px 14px;border:1px solid #ddd;"></td><td style="padding:10px 14px;border:1px solid #ddd;text-align:right;font-weight:700;">${dayOrders.reduce((acc,o)=> acc + (o.order_items || []).reduce((s,i)=>s + (i.quantity||0),0),0)}</td><td style="padding:10px 14px;border:1px solid #ddd;text-align:right;font-weight:700;">&#8369;${total.toFixed(2)}</td></tr></tbody></table></div></body></html>`;
-
-    await htmlToPdfAndDownload(html, `sales-report-${periodKey}.pdf`);
+  if (viewMode === 'weekly') {
+    const key = getWeekStartKey(dateOnly);
+    return { key, label: `Week of ${formatDate(key)}` };
   }
+  if (viewMode === 'monthly') {
+    const [year, month] = dateOnly.split('-');
+    return {
+      key: `${year}-${month}`,
+      label: `${MONTH_NAMES[Number(month) - 1] ?? month} ${year}`,
+    };
+  }
+  const year = dateOnly.slice(0, 4);
+  return { key: year, label: `Year ${year}` };
+}
 
-  function exportCsvForPeriod(periodKey: string) {
-    // Special handling for annual view - export all months from backend data
-    if (viewMode === 'annual' && annualData) {
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                         'July', 'August', 'September', 'October', 'November', 'December'];
-      const year = new Date().getFullYear();
-      
-      const headers = ['Month', 'Orders', 'Total'];
-      const rows = annualData.map((m) => [
-        monthNames[m.month - 1],
-        String(m.order_count),
-        Number(m.total_amount).toFixed(2),
-      ]);
-      
-      // Add totals row
-      const totalsOrders = annualData.reduce((sum, m) => sum + m.order_count, 0);
-      const totalsAmount = annualData.reduce((sum, m) => sum + m.total_amount, 0);
-      
-      const csv = [
-        headers.join(','),
-        ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')),
-        `"Totals","${totalsOrders}","${totalsAmount.toFixed(2)}"`
-      ].join('\n');
-      
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `sales-annual-${year}.csv`;
-      a.click();
-      return;
+export default function SalesReport() {
+  const currentYear = new Date().getFullYear();
+  const [viewMode, setViewMode] = useState<ViewMode>('daily');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+  const [detailPeriod, setDetailPeriod] = useState<PeriodGroup | null>(null);
+
+  const ordersQuery = useCachedQuery<RawOrder[]>(CacheKeys.orders, fetchOrders, {
+    refreshEvents: ['sale:recorded'],
+  });
+  const annualQuery = useCachedQuery<MonthlyDetail[]>(
+    CacheKeys.monthlySalesDetails(currentYear),
+    () => fetchMonthlyDetails(currentYear),
+    { refreshEvents: ['sale:recorded'] }
+  );
+
+  const orders = ordersQuery.data ?? [];
+  const annualData = annualQuery.data ?? [];
+
+  /** Completed orders inside the selected date range. */
+  const completedInRange = useMemo(
+    () =>
+      orders.filter((order) => {
+        if (!isCompleted(order)) return false;
+        if (!fromDate && !toDate) return true;
+        const day = orderDateOf(order).split('T')[0];
+        if (fromDate && day < fromDate) return false;
+        if (toDate && day > toDate) return false;
+        return true;
+      }),
+    [orders, fromDate, toDate]
+  );
+
+  const totals = useMemo(() => {
+    const revenue = completedInRange.reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0);
+    const items = completedInRange.reduce((sum, order) => sum + sumOrderQuantity(order), 0);
+    return {
+      revenue,
+      items,
+      orders: completedInRange.length,
+      average: completedInRange.length > 0 ? revenue / completedInRange.length : 0,
+    };
+  }, [completedInRange]);
+
+  /** Orders belonging to one period bucket — used by exports and the modal. */
+  const ordersForPeriod = (periodKey: string) =>
+    completedInRange.filter((order) => bucketOf(order, viewMode).key === periodKey);
+
+  const groups = useMemo<PeriodGroup[]>(() => {
+    // Annual with no date filter uses the backend monthly summary, which also
+    // covers months that have been archived out of the orders endpoint.
+    if (viewMode === 'annual' && annualData.length > 0 && !fromDate && !toDate) {
+      const orderCount = annualData.reduce((sum, month) => sum + month.order_count, 0);
+      const revenue = annualData.reduce((sum, month) => sum + Number(month.total_amount ?? 0), 0);
+      return [
+        {
+          key: String(currentYear),
+          label: `Year ${currentYear}`,
+          dayName: '',
+          orders: orderCount,
+          items: totals.items,
+          total: revenue,
+        },
+      ];
     }
 
-    // returns CSV of orders that belong to the specified periodKey (weekly/monthly/annual)
-    const periodOrders = filtered.filter((o) => {
-      if (!isCompleted(o)) return false; // only export completed orders for period
-      
-      // Use order_date if available, otherwise fall back to created_at
-      const dateStr = o.order_date || o.created_at;
-      
-      if (viewMode === 'weekly') {
-        // Parse date string as YYYY-MM-DD
-        const parts = dateStr.split('T')[0].split('-');
-        const year = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1;
-        const day = parseInt(parts[2]);
-        const dt = new Date(year, month, day);
-        const dayOfWeek = dt.getDay();
-        const diff = ((dayOfWeek + 6) % 7);
-        dt.setDate(dt.getDate() - diff);
-        // Format the date back as YYYY-MM-DD without timezone conversion
-        const weekStart = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-        return weekStart === periodKey;
-      }
-      if (viewMode === 'monthly') {
-        const parts = dateStr.split('T')[0].split('-');
-        return `${parts[0]}-${parts[1]}` === periodKey;
-      }
-      // fallback (daily) - use business day
-      return getBusinessDay(dateStr) === periodKey;
+    const buckets = new Map<string, PeriodGroup>();
+    for (const order of completedInRange) {
+      const { key, label } = bucketOf(order, viewMode);
+      const existing =
+        buckets.get(key) ?? { key, label, dayName: '', orders: 0, items: 0, total: 0 };
+      existing.orders += 1;
+      existing.items += sumOrderQuantity(order);
+      existing.total += Number(order.total_amount ?? 0);
+      buckets.set(key, existing);
+    }
+
+    const list = Array.from(buckets.values()).map((group) => {
+      if (viewMode !== 'daily') return group;
+      const [year, month, day] = group.key.split('-').map(Number);
+      const dayName = new Date(year, (month ?? 1) - 1, day ?? 1).toLocaleDateString('en-PH', {
+        weekday: 'long',
+      });
+      return { ...group, dayName };
     });
 
-    // If annual view, export a monthly breakdown CSV for the selected year
-    if (viewMode === 'annual') {
-      const months: Record<string, { orders: number; items: number; total: number; label?: string }> = {};
-      periodOrders.forEach((o) => {
-        const d = new Date(o.created_at);
-        const key = d.toISOString().slice(0, 7); // YYYY-MM
-        const label = new Date(d.getFullYear(), d.getMonth(), 1).toLocaleString(undefined, { month: 'short', year: 'numeric' });
-        months[key] = months[key] || { orders: 0, items: 0, total: 0, label };
-        months[key].orders += 1;
-        months[key].items += (o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0);
-        months[key].total += o.total_amount || 0;
+    // Newest first for day-level views, chronological for the wider ones.
+    list.sort((a, b) => (viewMode === 'daily' ? b.key.localeCompare(a.key) : a.key.localeCompare(b.key)));
+    return list;
+  }, [viewMode, annualData, fromDate, toDate, completedInRange, totals.items, currentYear]);
+
+  /** Chart series: oldest → newest, capped so labels stay readable. */
+  const chartData = useMemo(() => {
+    const ordered = [...groups].sort((a, b) => a.key.localeCompare(b.key)).slice(-14);
+    return {
+      categories: ordered.map((group) => group.label),
+      values: ordered.map((group) => Number(group.total.toFixed(2))),
+    };
+  }, [groups]);
+
+  const chartOptions: ApexOptions = {
+    colors: ['#465fff'],
+    chart: {
+      fontFamily: 'Outfit, sans-serif',
+      type: 'bar',
+      height: 240,
+      toolbar: { show: false },
+    },
+    plotOptions: { bar: { columnWidth: '45%', borderRadius: 6, borderRadiusApplication: 'end' } },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories: chartData.categories,
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      labels: { style: { colors: '#98a2b3', fontSize: '11px' }, rotate: -35, trim: true },
+    },
+    yaxis: {
+      labels: {
+        style: { colors: '#98a2b3', fontSize: '11px' },
+        formatter: (value: number) => formatCurrency(value),
+      },
+    },
+    grid: { borderColor: 'rgba(148, 163, 184, 0.18)', strokeDashArray: 4 },
+    tooltip: { y: { formatter: (value: number) => formatCurrency(value) } },
+  };
+
+  // ------------------------------------------------------------------ exports
+
+  const exportPeriodCsv = (group: PeriodGroup) => {
+    if (viewMode === 'annual' && annualData.length > 0 && !fromDate && !toDate) {
+      downloadCsv({
+        filename: `sales-annual-${currentYear}.csv`,
+        columns: ['Month', 'Orders', 'Total'],
+        rows: annualData.map((month) => [
+          MONTH_NAMES[month.month - 1] ?? String(month.month),
+          month.order_count,
+          Number(month.total_amount).toFixed(2),
+        ]),
+        totalsRow: [
+          'Totals',
+          annualData.reduce((sum, month) => sum + month.order_count, 0),
+          annualData.reduce((sum, month) => sum + Number(month.total_amount ?? 0), 0).toFixed(2),
+        ],
       });
-
-      const headers = ['Month', 'Orders', 'Items', 'Total'];
-      const rows = Object.keys(months).sort().map(k => [months[k].label ?? k, String(months[k].orders), String(months[k].items), Number(months[k].total).toFixed(2)]);
-      const grand = rows.reduce((acc, r) => { acc.orders += Number(r[1]); acc.items += Number(r[2]); acc.total += Number(r[3]); return acc; }, { orders: 0, items: 0, total: 0 });
-      const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')), `"Totals","${grand.orders}","${grand.items}","${grand.total.toFixed(2)}"`].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `sales-period-${viewMode}-${periodKey}.csv`;
-      a.click();
       return;
     }
 
-    const headers = ['Order ID', 'Date', 'Items', 'Total'];
-    const rows = periodOrders.map((o) => [
-      String(o.id),
-      new Date(o.order_date || o.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-      String((o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0)),
-      Number(o.total_amount || 0).toFixed(2),
-    ]);
-    
-    // Add totals row
-    const totalItems = periodOrders.reduce((acc, o) => acc + (o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0), 0);
-    const totalAmount = periodOrders.reduce((acc, o) => acc + (o.total_amount || 0), 0);
-    
-    const csv = [
-      headers.join(','), 
-      ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')),
-      `"Totals","","${totalItems}","${totalAmount.toFixed(2)}"`
-    ].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `sales-period-${viewMode}-${periodKey}.csv`;
-    a.click();
-  }
+    const periodOrders = ordersForPeriod(group.key);
+    downloadCsv({
+      filename: `sales-${viewMode}-${group.key}.csv`,
+      columns: ['Order #', 'Date', 'Items', 'Total'],
+      rows: periodOrders.map((order) => [
+        order.transaction_number || `#${order.id}`,
+        new Date(orderDateOf(order)).toLocaleString('en-PH'),
+        sumOrderQuantity(order),
+        Number(order.total_amount ?? 0).toFixed(2),
+      ]),
+      totalsRow: ['Totals', '', group.items, group.total.toFixed(2)],
+    });
+  };
 
-  async function exportFilteredDateRangeCsv() {
-    // Export all filtered orders (respecting date range) as CSV
-    const completedFiltered = filtered.filter((o) => isCompleted(o));
-    
-    if (completedFiltered.length === 0) {
-      alert('No orders to export in this date range');
+  const exportPeriodPdf = async (group: PeriodGroup) => {
+    if (viewMode === 'annual' && annualData.length > 0 && !fromDate && !toDate) {
+      await downloadPdfTable({
+        filename: `sales-annual-${currentYear}.pdf`,
+        title: `Annual sales report — ${currentYear}`,
+        columns: ['Month', { header: 'Orders', align: 'right' }, { header: 'Total', align: 'right' }],
+        rows: annualData.map((month) => [
+          MONTH_NAMES[month.month - 1] ?? String(month.month),
+          month.order_count,
+          formatCurrency(month.total_amount),
+        ]),
+        totalsRow: [
+          'Totals',
+          annualData.reduce((sum, month) => sum + month.order_count, 0),
+          formatCurrency(annualData.reduce((sum, month) => sum + Number(month.total_amount ?? 0), 0)),
+        ],
+      });
       return;
     }
 
-    const headers = ['Order ID', 'Date', 'Items', 'Total (₱)'];
-    const rows = completedFiltered.map((o) => [
-      String(o.id),
-      new Date(o.order_date || o.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-      String((o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0)),
-      Number(o.total_amount || 0).toFixed(2),
-    ]);
+    const periodOrders = ordersForPeriod(group.key);
+    await downloadPdfTable({
+      filename: `sales-${viewMode}-${group.key}.pdf`,
+      title: `Sales report — ${group.label}`,
+      subtitle: fromDate || toDate ? `Range: ${fromDate || 'start'} to ${toDate || 'today'}` : undefined,
+      columns: [
+        'Order #',
+        'Date',
+        { header: 'Items', align: 'right' },
+        { header: 'Total', align: 'right' },
+      ],
+      rows: periodOrders.map((order) => [
+        order.transaction_number || `#${order.id}`,
+        new Date(orderDateOf(order)).toLocaleString('en-PH'),
+        sumOrderQuantity(order),
+        formatCurrency(order.total_amount),
+      ]),
+      totalsRow: ['Totals', '', group.items, formatCurrency(group.total)],
+    });
+  };
 
-    // Add totals row
-    const totalItems = completedFiltered.reduce((acc, o) => acc + (o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0), 0);
-    const totalAmount = completedFiltered.reduce((acc, o) => acc + (o.total_amount || 0), 0);
+  const exportRangeCsv = () =>
+    downloadCsv({
+      filename: `sales-report-${fromDate || 'all'}-to-${toDate || 'today'}.csv`,
+      columns: ['Order #', 'Date', 'Items', 'Total'],
+      rows: completedInRange.map((order) => [
+        order.transaction_number || `#${order.id}`,
+        new Date(orderDateOf(order)).toLocaleString('en-PH'),
+        sumOrderQuantity(order),
+        Number(order.total_amount ?? 0).toFixed(2),
+      ]),
+      totalsRow: ['Totals', '', totals.items, totals.revenue.toFixed(2)],
+    });
 
-    const csv = [
-      headers.join(','),
-      ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')),
-      `"Totals","","${totalItems}","${totalAmount.toFixed(2)}"`
-    ].join('\n');
+  const exportRangePdf = () =>
+    downloadPdfTable({
+      filename: `sales-report-${fromDate || 'all'}-to-${toDate || 'today'}.pdf`,
+      title: 'Sales report',
+      subtitle: fromDate || toDate ? `${fromDate || 'start'} to ${toDate || 'today'}` : 'All dates',
+      columns: [
+        'Order #',
+        'Date',
+        { header: 'Items', align: 'right' },
+        { header: 'Total', align: 'right' },
+      ],
+      rows: completedInRange.map((order) => [
+        order.transaction_number || `#${order.id}`,
+        new Date(orderDateOf(order)).toLocaleString('en-PH'),
+        sumOrderQuantity(order),
+        formatCurrency(order.total_amount),
+      ]),
+      totalsRow: ['Totals', '', totals.items, formatCurrency(totals.revenue)],
+    });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    const dateRangeText = fromDate && toDate ? `${fromDate}_to_${toDate}` : 'all';
-    a.download = `sales-report-${dateRangeText}.csv`;
-    a.click();
-  }
+  // ------------------------------------------------------------------ columns
 
-  async function exportFilteredDateRangePdf() {
-    // Export all filtered orders (respecting date range) as PDF
-    const completedFiltered = filtered.filter((o) => isCompleted(o));
-    
-    if (completedFiltered.length === 0) {
-      alert('No orders to export in this date range');
-      return;
+  const columns = useMemo<ColumnDef<PeriodGroup>[]>(() => {
+    const base: ColumnDef<PeriodGroup>[] = [
+      {
+        accessorKey: 'label',
+        header: 'Period',
+        cell: ({ row }) => (
+          <span className="font-medium text-gray-900 dark:text-white">{row.original.label}</span>
+        ),
+      },
+      {
+        accessorKey: 'orders',
+        header: 'Orders',
+        cell: ({ row }) => formatNumber(row.original.orders),
+        meta: { align: 'right' },
+      },
+      {
+        accessorKey: 'items',
+        header: 'Items',
+        cell: ({ row }) => formatNumber(row.original.items),
+        meta: { align: 'right', hideBelowMd: true },
+      },
+      {
+        accessorKey: 'total',
+        header: 'Revenue',
+        cell: ({ row }) => (
+          <span className="font-semibold text-gray-900 dark:text-white">
+            {formatCurrency(row.original.total)}
+          </span>
+        ),
+        meta: { align: 'right' },
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-1.5">
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => exportPeriodCsv(row.original)}
+              startIcon={<FileDown className="h-3.5 w-3.5" />}
+            >
+              CSV
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => exportPeriodPdf(row.original)}
+              startIcon={<FileText className="h-3.5 w-3.5" />}
+            >
+              PDF
+            </Button>
+            <Button size="xs" onClick={() => setDetailPeriod(row.original)}>
+              Details
+            </Button>
+          </div>
+        ),
+        meta: { align: 'right' },
+      },
+    ];
+
+    if (viewMode === 'daily') {
+      base.unshift({
+        accessorKey: 'dayName',
+        header: 'Day',
+        cell: ({ row }) => (
+          <span className="text-gray-600 dark:text-gray-300">{row.original.dayName}</span>
+        ),
+        meta: { hideBelowMd: true },
+      });
     }
 
-    const rowsHtml = completedFiltered.map((o) => `
-      <tr>
-        <td style="padding:10px 14px;border:1px solid #ddd;">#${o.id}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;">${new Date(o.order_date || o.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;text-align:right;">${(o.order_items || []).reduce((s, i) => s + (i.quantity || 0), 0)}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;text-align:right;">&#8369;${(o.total_amount || 0).toFixed(2)}</td>
-      </tr>`).join('\n');
+    return base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, completedInRange, annualData, fromDate, toDate]);
 
-    const totalItems = completedFiltered.reduce((acc, o) => acc + (o.order_items || []).reduce((s, i) => s + (i.quantity || 0), 0), 0);
-    const totalAmount = completedFiltered.reduce((acc, o) => acc + (o.total_amount || 0), 0);
+  /** Product-level breakdown for the period opened in the modal. */
+  const detailProducts = useMemo(() => {
+    if (!detailPeriod) return [];
+    const aggregate = new Map<string, { name: string; quantity: number; revenue: number }>();
 
-    const dateRangeText = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All Dates';
-    const title = `Sales Report - ${dateRangeText}`;
-    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${title}</title><style>html,body{box-sizing:border-box;height:100%;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:18px}.report-wrapper{padding:10px;background:#fff;margin-top:48px}.report-header{margin-bottom:28px}table{border-collapse:collapse;width:calc(100% - 10px);margin:0 5px;table-layout:auto;border-spacing:0}th,td{padding:10px 14px;border:1px solid #ddd;vertical-align:middle;word-break:break-word}th{background:#f3f4f6;font-weight:700}thead th{text-align:left}tfoot td{font-weight:700}</style></head><body><div class="report-wrapper"><div class="report-header"><h2>${title}</h2><div>Generated: ${new Date().toLocaleString()}</div></div><table><thead><tr><th>Order #</th><th>Date</th><th style="text-align:right;">Items</th><th style="text-align:right;">Total (&#8369;)</th></tr></thead><tbody>${rowsHtml}<tr><td style="font-weight:700;padding:10px 14px;border:1px solid #ddd;">Totals</td><td style="padding:10px 14px;border:1px solid #ddd;"></td><td style="padding:10px 14px;border:1px solid #ddd;text-align:right;font-weight:700;">${totalItems}</td><td style="padding:10px 14px;border:1px solid #ddd;text-align:right;font-weight:700;">&#8369;${totalAmount.toFixed(2)}</td></tr></tbody></table></div></body></html>`;
-
-    await htmlToPdfAndDownload(html, `sales-report-${fromDate || 'all'}-to-${toDate || 'today'}.pdf`);
-  }
-
-  async function exportPdfForAnnual() {
-    if (!annualData) return;
-    
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                       'July', 'August', 'September', 'October', 'November', 'December'];
-    const year = new Date().getFullYear();
-    
-    const rowsHtml = annualData.map((m) => `
-      <tr>
-        <td style="padding:10px 14px;border:1px solid #ddd;">${monthNames[m.month - 1]}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;text-align:right;">${m.order_count}</td>
-        <td style="padding:10px 14px;border:1px solid #ddd;text-align:right;">&#8369;${Number(m.total_amount).toFixed(2)}</td>
-      </tr>`).join('\n');
-
-    const totalOrders = annualData.reduce((sum, m) => sum + m.order_count, 0);
-    const totalAmount = annualData.reduce((sum, m) => sum + m.total_amount, 0);
-
-    const title = `Annual Sales Report - ${year}`;
-    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${title}</title><style>html,body{box-sizing:border-box;height:100%;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:18px}.report-wrapper{padding:10px;background:#fff;margin-top:48px}.report-header{margin-bottom:28px}table{border-collapse:collapse;width:calc(100% - 10px);margin:0 5px;table-layout:auto;border-spacing:0}th,td{padding:10px 14px;border:1px solid #ddd;vertical-align:middle;word-break:break-word}th{background:#f3f4f6;font-weight:700}thead th{text-align:left}tfoot td{font-weight:700}</style></head><body><div class="report-wrapper"><div class="report-header"><h2>${title}</h2><div>Generated: ${new Date().toLocaleString()}</div></div><table><thead><tr><th>Month</th><th style="text-align:right;">Orders</th><th style="text-align:right;">Total (&#8369;)</th></tr></thead><tbody>${rowsHtml}<tr><td style="font-weight:700;padding:10px 14px;border:1px solid #ddd;">Totals</td><td style="padding:10px 14px;border:1px solid #ddd;text-align:right;font-weight:700;">${totalOrders}</td><td style="padding:10px 14px;border:1px solid #ddd;text-align:right;font-weight:700;">&#8369;${totalAmount.toFixed(2)}</td></tr></tbody></table></div></body></html>`;
-
-    await htmlToPdfAndDownload(html, `sales-annual-${year}.pdf`);
-  }
-
-  // grouped rows for the current view mode (daily/weekly/monthly/annual)
-  const groupedByPeriod: { key: string; label: string; orders: number; items: number; total: number }[] = [];
-  {
-    // Special handling for annual view - show single year row (respecting date filters)
-    if (viewMode === 'annual' && annualData) {
-      // For annual view, if date filters are set, only count filtered orders instead of using annualData totals
-      if (fromDate || toDate) {
-        const totalOrders = filtered.filter((o) => isCompleted(o)).length;
-        const totalAmount = filtered.filter((o) => isCompleted(o)).reduce((sum, o) => sum + (o.total_amount || 0), 0);
-        const totalItems = filtered.filter((o) => isCompleted(o)).reduce((sum, o) => sum + (o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0), 0);
-        
-        groupedByPeriod.push({
-          key: String(new Date().getFullYear()),
-          label: `Year ${new Date().getFullYear()} (Filtered)`,
-          orders: totalOrders,
-          items: totalItems,
-          total: totalAmount,
-        });
-      } else {
-        // No date filter - use backend annual data
-        const totalOrders = annualData.reduce((sum, m) => sum + m.order_count, 0);
-        const totalAmount = annualData.reduce((sum, m) => sum + m.total_amount, 0);
-        // Count items only from completed orders (those with sales)
-        const totalItems = filtered.filter((o) => isCompleted(o)).reduce((sum, o) => sum + (o.order_items || []).reduce((c: number, it: OrderItem) => c + (it.quantity || 0), 0), 0);
-        
-        groupedByPeriod.push({
-          key: String(new Date().getFullYear()),
-          label: `Year ${new Date().getFullYear()}`,
-          orders: totalOrders,
-          items: totalItems,
-          total: totalAmount,
-        });
+    for (const order of ordersForPeriod(detailPeriod.key)) {
+      for (const item of order.order_items ?? order.orderItems ?? []) {
+        const name =
+          item.product?.product_name ||
+          item.product?.name ||
+          item.product_name ||
+          item.name ||
+          `Product #${item.product_id ?? item.id}`;
+        const entry = aggregate.get(name) ?? { name, quantity: 0, revenue: 0 };
+        entry.quantity += Number(item.quantity ?? 0);
+        entry.revenue += Number(item.price ?? 0) * Number(item.quantity ?? 0);
+        aggregate.set(name, entry);
       }
-    } else {
-      // Regular grouping for daily/weekly/monthly views
-      const grouped: Record<string, { orders: number; items: number; total: number; label?: string }> = {};
-      filtered.forEach((o: Order) => {
-        if (!isCompleted(o)) return; // ignore non-completed orders for UI grouping consistency
-        // Use order_date if available, otherwise fall back to created_at
-        const dateStr = o.order_date || o.created_at;
-        const d = new Date(dateStr);
-        let key = '';
-        let label = '';
-
-        if (viewMode === 'daily') {
-          key = getBusinessDay(dateStr);
-          // Format as DD/MM/YYYY for display (day name shown in separate column)
-          const [year, month, day] = key.split('-');
-          label = `${day}/${month}/${year}`;
-          // Debug log
-          console.log(`[Daily Grouping] Order ${o.id}: dateStr=${dateStr}, businessDay=${key}, label=${label}`);
-        } else if (viewMode === 'weekly') {
-          // Parse date string as YYYY-MM-DD
-          const parts = dateStr.split('T')[0].split('-');
-          const year = parseInt(parts[0]);
-          const month = parseInt(parts[1]) - 1;
-          const day = parseInt(parts[2]);
-          const dt = new Date(year, month, day);
-          const dayOfWeek = dt.getDay(); // 0 Sun - 6 Sat
-          const diff = ((dayOfWeek + 6) % 7);
-          dt.setDate(dt.getDate() - diff);
-          // Format the date back as YYYY-MM-DD without timezone conversion
-          const weekStart = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-          key = weekStart;
-          label = `Week of ${weekStart}`;
-        } else if (viewMode === 'monthly') {
-          const parts = dateStr.split('T')[0].split('-');
-          key = `${parts[0]}-${parts[1]}`;
-          label = key;
-        } else {
-          // annual: group by month
-          const month = d.getMonth() + 1;
-          key = String(month);
-          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                             'July', 'August', 'September', 'October', 'November', 'December'];
-          label = monthNames[month - 1];
-        }
-
-        grouped[key] = grouped[key] || { orders: 0, items: 0, total: 0, label };
-        grouped[key].orders += 1;
-        grouped[key].items += (o.order_items || []).reduce((s: number, i: OrderItem) => s + (i.quantity || 0), 0);
-        grouped[key].total += o.total_amount || 0;
-      });
-
-      Object.keys(grouped)
-        .sort((a, b) => {
-          // For daily view, sort in descending order (latest first)
-          if (viewMode === 'daily') {
-            return b.localeCompare(a); // Descending: latest date first
-          }
-          // For other views, sort in ascending order (oldest first)
-          return a.localeCompare(b); // Ascending: oldest first
-        })
-        .forEach((k) => groupedByPeriod.push({ key: k, label: grouped[k].label || k, orders: grouped[k].orders, items: grouped[k].items, total: grouped[k].total }));
     }
-  }
 
+    return Array.from(aggregate.values()).sort((a, b) => b.quantity - a.quantity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailPeriod, completedInRange, viewMode]);
+
+  const showSkeleton = useShowSkeleton(ordersQuery.isInitialLoading);
+  const hasRange = Boolean(fromDate || toDate);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <PageMeta title="Sales Report" />
-      <div className="mb-6">
-        <PageBreadcrumb pageTitle="Sales Reports"
-        breadcrumbLabel="Sales Reports" />
-      </div>
+    <>
+      <PageMeta title="Sales report" />
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-        <div className="flex flex-col gap-2 mb-6">
-          {/* Date Range Filter */}
-          {loading ? (
-            <div className="flex items-end gap-3">
-              <div className="flex-1 max-w-xs">
-                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" />
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              </div>
-              <div className="flex-1 max-w-xs">
-                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" />
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              </div>
-              <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            </div>
-          ) : (
-            <div className="flex items-end gap-3">
-              <div className="flex-1 max-w-xs">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">From Date</label>
-                <input
-                  type="date"
-                  value={fromDate || ''}
-                  onChange={(e) => {
-                    setFromDate(e.target.value || null);
-                    console.log('From date set to:', e.target.value);
-                  }}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-              <div className="flex-1 max-w-xs">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">To Date</label>
-                <input
-                  type="date"
-                  value={toDate || ''}
-                  onChange={(e) => {
-                    setToDate(e.target.value || null);
-                    console.log('To date set to:', e.target.value);
-                  }}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-              <button
-                onClick={() => { setFromDate(null); setToDate(null); setCurrentPage(1); }}
-                className="px-3 py-1 text-sm bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-400 dark:hover:bg-gray-600 font-medium transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-          {(fromDate || toDate) && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-gray-600 dark:text-gray-400">
-                📅 Filtered: {fromDate} to {toDate} • {filtered.length > 0 ? `${filtered.length} order(s) found` : 'No orders in this range'}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => exportFilteredDateRangeCsv()}
-                  className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors"
-                >
-                  📥 Export CSV
-                </button>
-                <button
-                  onClick={() => exportFilteredDateRangePdf()}
-                  className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 font-medium transition-colors"
-                >
-                  📄 Export PDF
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+      <PageHeader
+        eyebrow="Reports"
+        title="Sales report"
+        description="Revenue, orders and items sold grouped by day, week, month or year."
+        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Sales report' }]}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              ordersQuery.refresh();
+              annualQuery.refresh();
+            }}
+            loading={ordersQuery.isRefreshing}
+            startIcon={<RefreshCw className="h-4 w-4" />}
+          >
+            Refresh
+          </Button>
+        }
+      />
 
-        <div className="flex items-center justify-between gap-6 mb-6">
-          {loading ? (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                <div className="flex gap-2">
-                  <div className="h-10 w-16 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-                  <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-                  <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-                  <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-                </div>
-              </div>
-              <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => { setViewMode('daily'); setCurrentPage(1); }} 
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                      viewMode === 'daily' 
-                        ? 'bg-brand-600 text-white shadow-md' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Daily
-                  </button>
-                  <button 
-                    onClick={() => { setViewMode('weekly'); setCurrentPage(1); }} 
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                      viewMode === 'weekly' 
-                        ? 'bg-brand-600 text-white shadow-md' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Weekly
-                  </button>
-                  <button 
-                    onClick={() => { setViewMode('monthly'); setCurrentPage(1); }} 
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                      viewMode === 'monthly' 
-                        ? 'bg-brand-600 text-white shadow-md' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button 
-                    onClick={() => { setViewMode('annual'); setCurrentPage(1); }} 
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                      viewMode === 'annual' 
-                        ? 'bg-brand-600 text-white shadow-md' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Annual
-                  </button>
-                </div>
-              </div>
-              <button 
-                onClick={() => { loadOrders(); loadAnnualData(); }} 
-                disabled={loading}
-                className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 font-medium transition-colors"
-              >
-                {loading ? 'Loading...' : 'Refresh'}
-              </button>
-            </>
-          )}
-        </div>
-
-        {loading && (
-          <div className="overflow-x-auto">
-            <div className="min-w-[600px] space-y-2 p-4">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 animate-pulse">
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
-                  </div>
-                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-                </div>
-              ))}
-            </div>
+      <div className="space-y-6">
+        {showSkeleton ? (
+          <SkeletonStatCards count={4} />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Revenue"
+              tone="success"
+              icon={<Wallet className="h-5 w-5" />}
+              value={formatCurrency(totals.revenue)}
+              hint={hasRange ? 'Selected range' : 'All time'}
+            />
+            <StatCard
+              label="Completed orders"
+              tone="brand"
+              icon={<Receipt className="h-5 w-5" />}
+              value={formatNumber(totals.orders)}
+            />
+            <StatCard
+              label="Items sold"
+              tone="info"
+              icon={<Package className="h-5 w-5" />}
+              value={formatNumber(totals.items)}
+            />
+            <StatCard
+              label="Average basket"
+              tone="violet"
+              icon={<TrendingUp className="h-5 w-5" />}
+              value={formatCurrency(totals.average)}
+            />
           </div>
         )}
-        {error && <div className="py-6 text-center text-red-600">{error}</div>}
 
-        {!loading && !error && (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[600px]">
-              <TableHeader>
-                <TableRow>
-                  {viewMode === 'daily' && <TableCell isHeader className="py-3 px-3 text-left">Day</TableCell>}
-                  <TableCell isHeader className="py-3 px-3 text-left">Period</TableCell>
-                  <TableCell isHeader className="py-3 px-3 text-right">Orders</TableCell>
-                  <TableCell isHeader className="py-3 px-3 text-right">Items</TableCell>
-                  <TableCell isHeader className="py-3 px-3 text-right">Total (₱)</TableCell>
-                  <TableCell isHeader className="py-3 px-3 text-center">Actions</TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groupedByPeriod.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((g) => {
-                  let dayName = '';
-                  if (viewMode === 'daily') {
-                    const [year, month, day] = g.key.split('-');
-                    dayName = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleString('en-US', { weekday: 'long' });
-                  }
+        <SectionCard
+          title="Filters"
+          description="Narrow the report to a date range, then export the result."
+          icon={<CalendarRange className="h-4 w-4" />}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-md">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  From date
+                </span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  To date
+                </span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                />
+              </label>
+            </div>
 
-                  return (
-                    <TableRow key={g.key} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      {viewMode === 'daily' && <TableCell className="py-3 px-3 font-medium text-gray-700 dark:text-gray-300">{dayName}</TableCell>}
-                      <TableCell className="py-3 px-3">{g.label}</TableCell>
-                      <TableCell className="py-3 px-3 text-right">{g.orders}</TableCell>
-                      <TableCell className="py-3 px-3 text-right">{g.items}</TableCell>
-                      <TableCell className="py-3 px-3 text-right">₱{g.total.toFixed(2)}</TableCell>
-                      <TableCell className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {viewMode === 'daily' ? (
-                            <button
-                              onClick={() => exportPdfForPeriod(g.key)}
-                              className="px-2 py-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                            >
-                              PDF
-                            </button>
-                          ) : viewMode === 'annual' ? (
-                            <button
-                              onClick={() => exportPdfForAnnual()}
-                              className="px-2 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
-                            >
-                              Export
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => exportCsvForPeriod(g.key)}
-                              className="px-2 py-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                            >
-                              CSV
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setModalPeriod({ key: g.key, label: g.label });
-                              setModalOpen(true);
-                            }}
-                            className="px-3 py-1 bg-brand-600 text-white rounded text-sm hover:bg-brand-700 transition-colors"
-                          >
-                            View Details
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}              </TableBody>
-            </Table>
-            
-            {/* Pagination controls */}
-            <div className="px-4 py-3 flex items-center justify-between border-t border-gray-100 dark:border-white/[0.04]">
-              <div className="text-sm text-gray-600">Page {currentPage} of {Math.max(1, Math.ceil(groupedByPeriod.length / itemsPerPage))}</div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="px-3 py-1 rounded bg-white border text-sm text-gray-600 hover:bg-gray-50"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                >Prev</button>
-                {Array.from({ length: Math.max(1, Math.ceil(groupedByPeriod.length / itemsPerPage)) }).map((_, idx) => {
-                  const page = idx + 1;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 rounded text-sm ${page === currentPage ? 'bg-blue-500 text-white' : 'bg-white border text-gray-700 hover:bg-gray-50'}`}
-                    >{page}</button>
-                  );
-                })}
-                <button
-                  className="px-3 py-1 rounded bg-white border text-sm text-gray-600 hover:bg-gray-50"
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                  disabled={currentPage >= Math.max(1, Math.ceil(groupedByPeriod.length / itemsPerPage))}
-                >Next</button>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {hasRange && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setFromDate('');
+                    setToDate('');
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportRangeCsv}
+                disabled={completedInRange.length === 0}
+                startIcon={<FileDown className="h-4 w-4" />}
+              >
+                Export CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportRangePdf}
+                disabled={completedInRange.length === 0}
+                startIcon={<FileText className="h-4 w-4" />}
+              >
+                Export PDF
+              </Button>
             </div>
           </div>
-        )}
+
+          {hasRange && (
+            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+              Showing {formatNumber(completedInRange.length)} completed order
+              {completedInRange.length === 1 ? '' : 's'} between {fromDate || 'the beginning'} and{' '}
+              {toDate || 'today'}.
+            </p>
+          )}
+        </SectionCard>
+
+        <SegmentedTabs<ViewMode>
+          aria-label="Report grouping"
+          value={viewMode}
+          onChange={setViewMode}
+          items={[
+            { value: 'daily', label: 'Daily' },
+            { value: 'weekly', label: 'Weekly' },
+            { value: 'monthly', label: 'Monthly' },
+            { value: 'annual', label: 'Annual' },
+          ]}
+        />
+
+        <SectionCard
+          title="Revenue trend"
+          description={`${viewMode === 'annual' ? 'Yearly' : `Last ${chartData.categories.length}`} periods`}
+          icon={<BarChart3 className="h-4 w-4" />}
+        >
+          {showSkeleton ? (
+            <SkeletonChart height={240} />
+          ) : chartData.values.length === 0 ? (
+            <EmptyState
+              size="sm"
+              icon={<BarChart3 className="h-6 w-6" />}
+              title="No sales in this range"
+              description="Adjust the date filter to see the revenue trend."
+            />
+          ) : (
+            <div className="max-w-full overflow-x-auto custom-scrollbar">
+              <div className="min-w-[560px]">
+                <Chart
+                  options={chartOptions}
+                  series={[{ name: 'Revenue', data: chartData.values }]}
+                  type="bar"
+                  height={240}
+                />
+              </div>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Breakdown"
+          description="Export a period or open it to see which products sold."
+          icon={<Receipt className="h-4 w-4" />}
+        >
+          {showSkeleton ? (
+            <SkeletonTable rows={6} columns={5} />
+          ) : (
+            <DataTable<PeriodGroup>
+              data={groups}
+              columns={columns}
+              error={ordersQuery.error}
+              resetPageKey={`${viewMode}-${fromDate}-${toDate}`}
+              pageSize={10}
+              pageSizeOptions={[10, 25, 50]}
+              itemLabel="periods"
+              minWidth={820}
+              emptyIcon={<Receipt className="h-7 w-7" />}
+              emptyTitle="No completed sales found"
+              emptyDescription="Confirm orders in the billing queue to populate this report."
+            />
+          )}
+        </SectionCard>
       </div>
 
-      {/* Product Details Modal */}
-      {modalOpen && modalPeriod && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-brand-50 to-white dark:from-gray-800 dark:to-gray-900">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Products Sold</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-medium">{modalPeriod.label}</p>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-all duration-200"
-                aria-label="Close modal"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+      {/* Product breakdown */}
+      <Modal isOpen={Boolean(detailPeriod)} onClose={() => setDetailPeriod(null)} className="m-4 max-w-3xl">
+        <div className="rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8">
+          <div className="pr-12">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Products sold</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{detailPeriod?.label}</p>
+          </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {(() => {
-                // Get all orders for this period
-                const periodOrders = filtered.filter((o) => {
-                  if (!isCompleted(o)) return false;
-                  const dateStr = o.order_date || o.created_at;
-                  
-                  if (viewMode === 'daily') {
-                    return getBusinessDay(dateStr) === modalPeriod.key;
-                  } else if (viewMode === 'weekly') {
-                    const parts = dateStr.split('T')[0].split('-');
-                    const year = parseInt(parts[0]);
-                    const month = parseInt(parts[1]) - 1;
-                    const day = parseInt(parts[2]);
-                    const dt = new Date(year, month, day);
-                    const dayOfWeek = dt.getDay();
-                    const diff = ((dayOfWeek + 6) % 7);
-                    dt.setDate(dt.getDate() - diff);
-                    const weekStart = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-                    return weekStart === modalPeriod.key;
-                  } else if (viewMode === 'monthly') {
-                    const parts = dateStr.split('T')[0].split('-');
-                    return `${parts[0]}-${parts[1]}` === modalPeriod.key;
-                  }
-                  return false;
-                });
-
-                // Aggregate products sold in this period
-                const productSales: Record<string, { name: string; quantity: number; revenue: number }> = {};
-                periodOrders.forEach((order) => {
-                  (order.order_items || []).forEach((item) => {
-                    // Try multiple ways to get the product name
-                    const productName = item.product?.product_name || item.product?.name || item.product_name || item.name || `Product #${item.product_id || item.id}`;
-                    const key = productName;
-                    if (!productSales[key]) {
-                      productSales[key] = { name: productName, quantity: 0, revenue: 0 };
-                    }
-                    productSales[key].quantity += item.quantity || 0;
-                    productSales[key].revenue += (item.price || 0) * (item.quantity || 0);
-                  });
-                });
-                
-                const sortedProducts = Object.values(productSales).sort((a, b) => b.quantity - a.quantity);
-                
-                return sortedProducts.length > 0 ? (
-                  <div className="overflow-x-auto -mx-6">
-                    <div className="inline-block min-w-full align-middle px-6">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
-                          <tr>
-                            <th className="py-4 px-6 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Product Name</th>
-                            <th className="py-4 px-6 text-right text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Quantity Sold</th>
-                            <th className="py-4 px-6 text-right text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">Revenue</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">{sortedProducts.map((product, idx) => (
-                            <tr key={idx} className="hover:bg-brand-50 dark:hover:bg-gray-800/80 transition-colors duration-150">
-                              <td className="py-4 px-6 text-sm font-medium text-gray-900 dark:text-gray-100">{product.name}</td>
-                              <td className="py-4 px-6 text-sm text-right text-gray-700 dark:text-gray-300 font-semibold">{product.quantity}</td>
-                              <td className="py-4 px-6 text-sm text-right text-gray-700 dark:text-gray-300 font-semibold">₱{product.revenue.toFixed(2)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gradient-to-r from-brand-100 to-brand-50 dark:from-gray-700 dark:to-gray-800 border-t-2 border-brand-400 dark:border-gray-600">
-                          <tr>
-                            <td className="py-4 px-6 text-sm font-bold text-gray-900 dark:text-white uppercase">Total</td>
-                            <td className="py-4 px-6 text-sm text-right font-bold text-brand-700 dark:text-brand-400">
-                              {sortedProducts.reduce((sum, p) => sum + p.quantity, 0)} items
-                            </td>
-                            <td className="py-4 px-6 text-sm text-right font-bold text-brand-700 dark:text-brand-400">
-                              ₱{sortedProducts.reduce((sum, p) => sum + p.revenue, 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-16">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                      </svg>
-                    </div>
-                    <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">No Products Sold</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">There were no products sold during this period</p>
-                  </div>
-                );
-              })()}
-            </div>
-
-
+          <div className="mt-6 max-h-[60vh] overflow-y-auto">
+            {detailProducts.length === 0 ? (
+              <EmptyState
+                size="sm"
+                icon={<Package className="h-6 w-6" />}
+                title="No products sold"
+                description="There were no sales recorded in this period."
+              />
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-white/[0.02]">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Product
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Quantity
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Revenue
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {detailProducts.map((product) => (
+                    <tr key={product.name}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                        {product.name}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-300">
+                        {formatNumber(product.quantity)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(product.revenue)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t-2 border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-white/[0.02]">
+                  <tr>
+                    <td className="px-4 py-3 text-sm font-bold uppercase text-gray-700 dark:text-gray-200">
+                      Total
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-brand-600 dark:text-brand-400">
+                      {formatNumber(detailProducts.reduce((sum, item) => sum + item.quantity, 0))}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-brand-600 dark:text-brand-400">
+                      {formatCurrency(detailProducts.reduce((sum, item) => sum + item.revenue, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
           </div>
         </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 }

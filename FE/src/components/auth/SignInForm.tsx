@@ -1,159 +1,212 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router";
-import { OrderIcon, EyeCloseIcon, EyeIcon } from "../../icons";
+import { useNavigate, useLocation } from "react-router";
+import { Lock, LogIn, User } from "lucide-react";
+import { toast } from "sonner";
+
+import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
-import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import api from "../../lib/axios";
-import { toast } from 'sonner';
+import { resetAppData } from "../../context/AppDataContext";
+import { cn } from "../../lib/utils";
+
+/**
+ * Staff sign-in for the POS.
+ *
+ * One credential set, one terminal: the form is deliberately short so a cashier
+ * can be on the till in a couple of keystrokes.
+ */
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const navigate = useNavigate();
   const location = useLocation();
-  
+
+  const fieldClasses = cn(
+    "h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm text-gray-900 shadow-sm transition-all duration-200",
+    "placeholder:text-gray-400 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100",
+    "dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:ring-brand-500/20"
+  );
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      // The seeded admin uses an email address; accept a bare username too.
+      const email = username.includes("@") ? username : `${username}@example.com`;
+
+      // Laravel Sanctum expects a CSRF cookie before the login POST.
+      try {
+        await fetch("/sanctum/csrf-cookie", { credentials: "include" });
+      } catch {
+        // Not every deployment requires CSRF cookies.
+      }
+
+      const response = await api.post("/login", { email, password });
+      const token = response?.data?.token;
+      if (token) {
+        localStorage.setItem("api_token", token);
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Start the session with an empty cache so the dashboard runs its
+      // one-time initial data load (and skeleton) after login.
+      resetAppData();
+
+      try {
+        toast.success("Signed in — opening your workspace…");
+      } catch {
+        // Toast failures must never block navigation.
+      }
+
+      const from = (location.state as any)?.from?.pathname || "/dashboard";
+      setTimeout(() => navigate(from), 300);
+    } catch (caught: unknown) {
+      let message = "Sign in failed. Please check your credentials.";
+      if (caught && typeof caught === "object") {
+        message = (caught as any)?.response?.data?.message || (caught as any)?.message || message;
+      } else if (typeof caught === "string") {
+        message = caught;
+      }
+
+      if (String(message).toLowerCase().includes("network error")) {
+        message =
+          "Cannot reach the server. Make sure the backend is running at http://127.0.0.1:8000 and the dev server proxy is active.";
+      }
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1">
-      <div className="w-full max-w-md pt-10 mx-auto">
-        <Link
-          to="/"
-          className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-        </Link>
-      </div>
-      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
-        <div>
-          <div className="mb-5 sm:mb-8">
-            <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Sign In
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Admin Login — For customers, please continue to “Order”.
-            </p>
-          </div>
+    <div className="w-full max-w-md">
+      {/* Card */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 rounded-3xl border border-gray-200/80 bg-white/95 p-7 shadow-xl backdrop-blur duration-500 dark:border-gray-800 dark:bg-gray-900/90 sm:p-9">
+        {/* Brand — visible on small screens where the side panel is hidden */}
+        <div className="mb-7 flex items-center gap-3 lg:hidden">
+          <img
+            src="/images/logo/MKB.jpg"
+            alt="MKB logo"
+            width={44}
+            height={44}
+            className="rounded-xl shadow-sm"
+          />
           <div>
-            <div className="flex justify-center">
-              <Link to="/user_order">
-                <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-semibold text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                  <OrderIcon className="font-semibold w-5 h-5" />
-                  ORDER
-                </button>
-              </Link>
-            </div>
-            <div className="relative py-3 sm:py-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="p-2 text-gray-400 bg-white dark:bg-gray-900 sm:px-5 sm:py-2">
-                  Or
-                </span>
-              </div>
-            </div>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setError(null);
-                setLoading(true);
-                try {
-                  // Map username to email if no @ present (seed uses admin@example.com)
-                  const email = String(username || '').includes('@') ? username : `${username}@example.com`;
-                  // Ensure CSRF cookie is present (Laravel Sanctum) before login
-                  try {
-                    await fetch('/sanctum/csrf-cookie', { credentials: 'include' });
-                  } catch {
-                    // ignore if fetch fails; backend may not require CSRF
-                  }
-                  const resp = await api.post('/login', { email, password });
-                  // If backend returns a token, store it and set default header
-                  const token = resp?.data?.token;
-                  if (token) {
-                    localStorage.setItem('api_token', token);
-                    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-                  }
-                  // Show a non-blocking toast (sonner) and navigate shortly after
-                  try {
-                    toast.success('Successfully logged in — redirecting...');
-                  } catch {}
-                  // If user was redirected to sign-in while trying to access a protected route,
-                  // navigate them back to that path after login (default to /dashboard)
-                  const from = (location.state as any)?.from?.pathname || '/dashboard';
-                  setTimeout(() => navigate(from), 300);
-                } catch (err: unknown) {
-                  // Helpful network error handling — axios throws a message 'Network Error'
-                  let message = 'Login failed';
-                  if (err && typeof err === 'object') {
-                    // Prefer backend message when available
-                    message = (err as any)?.response?.data?.message || (err as any)?.message || message;
-                  } else if (typeof err === 'string') {
-                    message = err;
-                  }
-
-                  // If this is a connectivity error, make the message actionable
-                  if (String(message).toLowerCase().includes('network error')) {
-                    message = 'Network error — could not reach the API. Make sure the backend (Laravel) is running (http://127.0.0.1:8000) and that you started the frontend dev server (npm run dev) so the /api proxy is active.';
-                  }
-
-                  setError(message);
-                } finally {
-                  setLoading(false);
-                }
-              }}
-            >
-              <div className="space-y-6">
-                <div>
-                  <Label>
-                    Admin Username <span className="text-error-500">*</span>{" "}
-                  </Label>
-                  <Input placeholder="admin or admin@example.com" value={username} onChange={(e) => setUsername((e.target as HTMLInputElement).value)} />
-                </div>
-                <div>
-                  <Label>
-                    Password <span className="text-error-500">*</span>{" "}
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword((e.target as HTMLInputElement).value)}
-                    />
-                    <span
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
-                    >
-                      {showPassword ? (
-                        <EyeIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
-                      ) : (
-                        <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Checkbox checked={isChecked} onChange={setIsChecked} />
-                    <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
-                      Keep me logged in
-                    </span>
-                  </div>
-                </div>
-                {error && <div className="text-sm text-red-500">{error}</div>}
-                <div>
-                  <Button className="w-full" size="sm" type="submit" disabled={loading}>
-                    {loading ? 'Signing in...' : 'Sign in'}
-                  </Button>
-                </div>
-              </div>
-            </form>
+            <p className="text-lg font-bold leading-tight text-gray-900 dark:text-white">MKB</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Point of Sale</p>
           </div>
         </div>
+
+        <header className="mb-7">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            Staff access
+          </span>
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+            Sign in to the terminal
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Enter your credentials to open the register and start selling.
+          </p>
+        </header>
+
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <div>
+            <Label htmlFor="username">
+              Username <span className="text-error-500">*</span>
+            </Label>
+            <div className="relative">
+              <User
+                className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                aria-hidden="true"
+              />
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                placeholder="admin"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                className={fieldClasses}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="password">
+              Password <span className="text-error-500">*</span>
+            </Label>
+            <div className="relative">
+              <Lock
+                className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                aria-hidden="true"
+              />
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className={cn(fieldClasses, "pr-12")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              >
+                {showPassword ? (
+                  <EyeIcon className="size-5 fill-current" />
+                ) : (
+                  <EyeCloseIcon className="size-5 fill-current" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Checkbox checked={keepSignedIn} onChange={setKeepSignedIn} />
+            <span className="text-sm text-gray-600 dark:text-gray-400">Keep me signed in</span>
+          </div>
+
+          {error && (
+            <div
+              role="alert"
+              className="animate-in fade-in slide-in-from-top-1 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 duration-300 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+            >
+              {error}
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            fullWidth
+            loading={loading}
+            startIcon={<LogIn className="h-4 w-4" />}
+          >
+            {loading ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
       </div>
+
+      <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
+        MKB Order and Sales Inventory Management System
+      </p>
     </div>
   );
 }

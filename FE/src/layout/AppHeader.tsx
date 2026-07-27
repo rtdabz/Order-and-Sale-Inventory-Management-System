@@ -1,162 +1,36 @@
-import { useEffect, useRef, useState } from "react";
-import api from "../lib/axios";
-import { toast } from 'sonner';
-
+import { useState } from "react";
 import { Link } from "react-router";
+
 import { useSidebar } from "../context/SidebarContext";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
 
+/**
+ * Top bar for the authenticated shell.
+ *
+ * Sales are completed at the terminal, so there is nothing to poll for here —
+ * no incoming-order queue and no arrival chime.
+ */
 const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
   const handleToggle = () => {
-    if (window.innerWidth >= 991) {
-      toggleSidebar();
-    } else {
-      toggleMobileSidebar();
-    }
+    if (window.innerWidth >= 991) toggleSidebar();
+    else toggleMobileSidebar();
   };
-
-  const toggleApplicationMenu = () => {
-    setApplicationMenuOpen(!isApplicationMenuOpen);
-  };
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const prevPendingRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
-
-  // Poll orders periodically and play a bell sound when pending orders increase
-  useEffect(() => {
-    let mounted = true;
-    let first = true;
-    const playNotificationSound = () => {
-      try {
-        const AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        // Two-tone bell-style beep
-        const now = ctx.currentTime;
-        const gain = ctx.createGain();
-        gain.connect(ctx.destination);
-
-        const osc1 = ctx.createOscillator();
-        osc1.type = 'sine';
-        osc1.frequency.value = 880; // A5
-        osc1.connect(gain);
-
-        const osc2 = ctx.createOscillator();
-        osc2.type = 'sine';
-        osc2.frequency.value = 1320; // E6
-        osc2.connect(gain);
-
-        gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.exponentialRampToValueAtTime(0.2, now + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
-
-        osc1.start(now);
-        osc2.start(now + 0.08);
-        osc1.stop(now + 0.5);
-        osc2.stop(now + 0.58);
-
-        // Try to gracefully close audio context after a short time
-        setTimeout(() => {
-          try { ctx.close(); } catch(e) {}
-        }, 800);
-      } catch (e) {
-        // ignore audio failures
-        console.debug('playNotificationSound failed', e);
-      }
-    };
-
-    // Try to initialize realtime. If provider available we'll subscribe to OrderCreated events.
-    let pollId: any = null;
-    let unsubRealtime: (() => void) | null = null;
-
-    (async () => {
-      try {
-        const rt = await import("../lib/realtime");
-        const info = await rt.initRealtime();
-        if (!mounted) return;
-        if (info.provider === "pusher" || info.provider === "sse") {
-          // subscribe to order created events
-          unsubRealtime = rt.subscribe("orders", "OrderCreated", (_payload: any) => {
-            try { playNotificationSound(); } catch {}
-            try { toast.success('New order received'); } catch {}
-            // refresh pending count for header consumers (store or local ref) — we'll set prevPending so next poll doesn't double notify
-            // Save payload handling if needed
-            prevPendingRef.current = prevPendingRef.current ?? 0;
-          });
-          return;
-        }
-      } catch (e) {
-        // ignore
-      }
-
-      // fallback to polling (same behavior as before)
-      const checkOrders = async () => {
-        try {
-          const res = await api.get('/orders');
-          const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-          const pending = Array.isArray(data) ? data.filter((o: any) => !o.sale).length : 0;
-          if (!mounted) return;
-          if (first) {
-            prevPendingRef.current = pending;
-            first = false;
-            return;
-          }
-          const prev = prevPendingRef.current ?? 0;
-          if (pending > prev) {
-            // new orders arrived
-            playNotificationSound();
-            try { toast(String(`${pending - prev} new order${pending - prev > 1 ? 's' : ''}`)); } catch {}
-          }
-          prevPendingRef.current = pending;
-        } catch (e) {
-          // ignore network errors
-        }
-      };
-
-      checkOrders();
-      pollId = setInterval(checkOrders, 5000);
-    })();
-
-    return () => { mounted = false; if (pollId) clearInterval(pollId); if (unsubRealtime) unsubRealtime(); };
-  }, []);
 
   return (
-    <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 lg:border-b">
-      <div className="flex flex-col items-center justify-between flex-grow lg:flex-row lg:px-6">
-        <div className="flex items-center justify-between w-full gap-2 px-3 py-3 border-b border-gray-200 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
+    <header className="sticky top-0 z-99999 flex w-full border-gray-200 bg-white lg:border-b">
+      <div className="flex flex-grow flex-col items-center justify-between lg:flex-row lg:px-6">
+        <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
           <button
-            className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 lg:flex lg:h-11 lg:w-11 lg:border"
+            className="z-99999 items-center justify-center h-10 w-10 rounded-lg border-gray-200 text-gray-500 lg:flex lg:h-11 lg:w-11 lg:border"
             onClick={handleToggle}
-            aria-label="Toggle Sidebar"
+            aria-label="Toggle sidebar"
           >
             {isMobileOpen ? (
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path
                   fillRule="evenodd"
                   clipRule="evenodd"
@@ -165,13 +39,7 @@ const AppHeader: React.FC = () => {
                 />
               </svg>
             ) : (
-              <svg
-                width="16"
-                height="12"
-                viewBox="0 0 16 12"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
                 <path
                   fillRule="evenodd"
                   clipRule="evenodd"
@@ -180,31 +48,26 @@ const AppHeader: React.FC = () => {
                 />
               </svg>
             )}
-            {/* Cross Icon */}
           </button>
 
-          <Link to="/" className="lg:hidden flex items-center gap-3">
+          <Link to="/dashboard" className="flex items-center gap-3 lg:hidden">
             <img
-              className="dark:hidden rounded-lg"
+              className="rounded-lg dark:hidden"
               src="/images/logo/MKB.jpg"
               alt="MKB logo"
               width={50}
               height={50}
             />
-            <span className="font-semibold text-2xl text-gray-800 dark:text-gray-900">MKB</span>
+            <span className="text-2xl font-semibold text-gray-800">MKB</span>
           </Link>
 
           <button
-            onClick={toggleApplicationMenu}
-            className="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg z-99999 hover:bg-gray-100 lg:hidden"
+            onClick={() => setApplicationMenuOpen((open) => !open)}
+            aria-label="Toggle header menu"
+            aria-expanded={isApplicationMenuOpen}
+            className="z-99999 flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 lg:hidden"
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
                 fillRule="evenodd"
                 clipRule="evenodd"
@@ -213,21 +76,16 @@ const AppHeader: React.FC = () => {
               />
             </svg>
           </button>
-
-        
         </div>
+
         <div
           className={`${
             isApplicationMenuOpen ? "flex" : "hidden"
-          } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
+          } w-full items-center justify-between gap-4 px-5 py-4 shadow-theme-md lg:flex lg:justify-end lg:px-0 lg:shadow-none`}
         >
           <div className="flex items-center gap-2 2xsm:gap-3">
-           
-            {/* <!-- Dark Mode Toggler --> */}
             <NotificationDropdown />
-            {/* <!-- Notification Menu Area --> */}
           </div>
-          {/* <!-- User Area --> */}
           <UserDropdown />
         </div>
       </div>

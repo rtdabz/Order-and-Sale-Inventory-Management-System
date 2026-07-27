@@ -1,556 +1,578 @@
-import React, { useEffect, useState } from "react";
-import PageBreadcrumb from "../../components/common/PageBreadCrumb";
-import ComponentCard from "../../components/common/ComponentCard";
-import PageMeta from "../../components/common/PageMeta";
-import ProductTable from "../../components/ProductTable/ProductTable";
-import Button from "../../components/ui/button/Button";
-import { Modal } from "../../components/ui/modal";
-import Label  from "../../components/form/Label";
-import Input from "../../components/form/input/InputField";
-import Select from "../../components/form/Select";
-import FileInput from "../../components/form/input/FileInput";
-import CreateComboMealModal from "../../components/modals/CreateComboMealModal";
-import api from "../../lib/axios";
+import React, { useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
+import {
+  AlertTriangle,
+  Archive,
+  Boxes,
+  PackagePlus,
+  PackageSearch,
+  RefreshCw,
+  Sandwich,
+  Wallet,
+} from 'lucide-react';
+
+import PageMeta from '../../components/common/PageMeta';
+import PageHeader from '../../components/common/PageHeader';
+import SectionCard from '../../components/ui/card/SectionCard';
+import StatCard from '../../components/ui/card/StatCard';
+import SearchInput from '../../components/ui/input/SearchInput';
+import EmptyState from '../../components/ui/empty/EmptyState';
+import Button from '../../components/ui/button/Button';
+import { SkeletonStatCards } from '../../components/ui/skeleton/Skeleton';
+import { Modal } from '../../components/ui/modal';
+import Label from '../../components/form/Label';
+import Input from '../../components/form/input/InputField';
+import Select from '../../components/form/Select';
+import FileInput from '../../components/form/input/FileInput';
+import ProductTable from '../../components/ProductTable/ProductTable';
+import CreateComboMealModal from '../../components/modals/CreateComboMealModal';
+
+import api from '../../lib/axios';
+import { useCachedQuery } from '../../hooks/useCachedQuery';
+import { useShowSkeleton } from '../../context/AppDataContext';
+import { CacheKeys } from '../../lib/dataCache';
+import {
+  buildStockMap,
+  categoryLabel,
+  fetchCategories,
+  fetchInventories,
+  fetchProducts,
+  productName,
+  RawCategory,
+  RawInventory,
+  RawProduct,
+} from '../../lib/apiResources';
+import { formatCurrency, formatNumber } from '../../lib/format';
+
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_IMAGE_EXTENSIONS = ['.jpeg', '.jpg', '.png', '.gif', '.webp'];
+
+const swalZIndex = () => {
+  const container = document.querySelector('.swal2-container') as HTMLElement | null;
+  if (container) container.style.zIndex = '200000';
+};
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') resolve(result);
+      else reject(new Error('Unexpected file reader result'));
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function Products() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isComboModalOpen, setIsComboModalOpen] = useState(false);
-  const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false);
-  const [archivedProducts, setArchivedProducts] = useState<any[]>([]);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [comboModalOpen, setComboModalOpen] = useState(false);
+  const [archivedModalOpen, setArchivedModalOpen] = useState(false);
+  const [archivedProducts, setArchivedProducts] = useState<RawProduct[]>([]);
   const [archivedLoading, setArchivedLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [pageLoading, setPageLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
+  // Add-product form
+  const [newName, setNewName] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newImage, setNewImage] = useState<File | null>(null);
+  const [isStockable, setIsStockable] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const productsQuery = useCachedQuery<RawProduct[]>(CacheKeys.products, fetchProducts, {
+    refreshEvents: ['products:refresh'],
+  });
+  const inventoriesQuery = useCachedQuery<RawInventory[]>(CacheKeys.inventories, fetchInventories, {
+    refreshEvents: ['products:refresh'],
+  });
+  const categoriesQuery = useCachedQuery<RawCategory[]>(CacheKeys.categories, fetchCategories);
+
+  const categoryOptions = useMemo(
+    () =>
+      (categoriesQuery.data ?? []).map((category) => ({
+        value: String(category.id),
+        label: category.category_name || category.name || `#${category.id}`,
+      })),
+    [categoriesQuery.data]
+  );
+
+  /** Headline inventory numbers for the KPI strip. */
+  const stats = useMemo(() => {
+    const products = (productsQuery.data ?? []).filter((product) => product.status !== 'archived');
+    const stockMap = buildStockMap(inventoriesQuery.data ?? []);
+
+    let inStock = 0;
+    let lowStock = 0;
+    let outOfStock = 0;
+    let stockValue = 0;
+    let combos = 0;
+
+    for (const product of products) {
+      if (product.is_bundle) {
+        combos += 1;
+        continue;
+      }
+      const untracked = product.is_stockable === false || product.is_stockable === 0;
+      if (untracked) {
+        inStock += 1;
+        continue;
+      }
+      const quantity = Number(stockMap[Number(product.id)] ?? 0);
+      stockValue += quantity * Number(product.price ?? 0);
+      if (quantity <= 0) outOfStock += 1;
+      else if (quantity <= 10) lowStock += 1;
+      else inStock += 1;
+    }
+
+    return { total: products.length, inStock, lowStock, outOfStock, stockValue, combos };
+  }, [productsQuery.data, inventoriesQuery.data]);
+
+  const showSkeleton = useShowSkeleton(productsQuery.isInitialLoading);
+
+  const notifyProductsChanged = () => window.dispatchEvent(new CustomEvent('products:refresh'));
 
   const openArchivedModal = async () => {
-    setIsArchivedModalOpen(true);
+    setArchivedModalOpen(true);
     setArchivedLoading(true);
     try {
-      const res = await api.get('/products/archived');
-      const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+      const response = await api.get('/products/archived');
+      const data = Array.isArray(response.data) ? response.data : response.data.data || [];
       setArchivedProducts(data);
-    } catch (err) {
-      console.error('Failed to load archived products:', err);
+    } catch (error) {
+      console.error('Failed to load archived products:', error);
       setArchivedProducts([]);
     } finally {
       setArchivedLoading(false);
     }
   };
 
-  const closeArchivedModal = () => setIsArchivedModalOpen(false);
-
-  // --- New: form state for Add Product ---
-  const [productName, setProductName] = useState("");
-  const [price, setPrice] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(""); // will be category id as string
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isStockable, setIsStockable] = useState(true);
-  
-  const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveImageError, setSaveImageError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const fetchCategories = async () => {
-      try {
-        setPageLoading(true);
-        const res = await api.get('/categories');
-        if (!mounted) return;
-        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
-        const opts = data.map((c: any) => ({ value: String(c.id), label: c.category_name || c.name || `#${c.id}` }));
-        setCategories(opts);
-      } catch (err) {
-        // ignore for now; categories can be added manually
-        setCategories([]);
-      } finally {
-        if (mounted) setPageLoading(false);
-      }
-    };
-    fetchCategories();
-    return () => { mounted = false; };
-  }, []);
-
-  const handleSelectChangeInternal = (value: string) => {
-    setSelectedCategory(value);
+  const resetAddForm = () => {
+    setNewName('');
+    setNewPrice('');
+    setNewCategory('');
+    setNewImage(null);
+    setIsStockable(true);
+    setImageError(null);
+    setSaveError(null);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-    // client-side validation: allowed types and max size (25MB)
-    if (f) {
-      console.log('[handleFileChange] File selected:', {
-        name: f.name,
-        type: f.type,
-        size: f.size,
-        sizeKB: (f.size / 1024).toFixed(2) + ' KB'
-      });
-      
-      const allowedExt = ['.jpeg', '.jpg', '.png', '.gif', '.webp'];
-      const name = String(f.name || '').toLowerCase();
-      const hasExt = allowedExt.some((ext) => name.endsWith(ext));
-      const isImageType = String(f.type || '').startsWith('image/');
-      const maxSize = 25 * 1024 * 1024; // 25MB
-      
-      console.log('[handleFileChange] Validation:', {
-        name,
-        hasExt,
-        isImageType,
-        passesTypeCheck: isImageType || hasExt,
-        size: f.size,
-        maxSize,
-        passesSizeCheck: f.size <= maxSize
-      });
-      
-      if (!(isImageType || hasExt)) {
-        console.error('[handleFileChange] Type validation failed');
-        setSaveImageError('The file must be an image (jpeg, jpg, png, gif, webp).');
-        setImageFile(null);
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (file) {
+      const name = file.name.toLowerCase();
+      const hasAllowedExtension = ALLOWED_IMAGE_EXTENSIONS.some((extension) => name.endsWith(extension));
+      const looksLikeImage = String(file.type || '').startsWith('image/');
+
+      if (!looksLikeImage && !hasAllowedExtension) {
+        setImageError('The file must be an image (jpeg, jpg, png, gif, webp).');
+        setNewImage(null);
         return;
       }
-      if (f.size && f.size > maxSize) {
-        console.error('[handleFileChange] Size validation failed');
-        setSaveImageError('Image is too large — maximum allowed size is 25 MB.');
-        setImageFile(null);
+      if (file.size > MAX_IMAGE_BYTES) {
+        setImageError('Image is too large — maximum allowed size is 25 MB.');
+        setNewImage(null);
         return;
       }
-      
-      console.log('[handleFileChange] Validation passed, file accepted');
     }
-    setSaveImageError(null);
-    setImageFile(f);
+    setImageError(null);
+    setNewImage(file);
   };
 
-  // Helper: convert a File to a data URL (base64) string
-  const fileToDataUrl = (file: File) => {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.onload = () => {
-        const result = reader.result as string | ArrayBuffer | null;
-        if (typeof result === 'string') resolve(result);
-        else reject(new Error('Unexpected file reader result'));
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const submitProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // prevent submit if we've flagged an image error client-side
-    if (saveImageError) {
-      setSaveError(saveImageError);
+  const submitProduct = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (imageError) {
+      setSaveError(imageError);
       return;
     }
-    
-    // Check for duplicate product name
-    try {
-      const res = await api.get('/products');
-      const existingProducts = Array.isArray(res.data) ? res.data : res.data.data || [];
-      const duplicateName = existingProducts.some((p: any) => 
-        p.product_name && p.product_name.toLowerCase() === productName.toLowerCase()
-      );
-      
-      if (duplicateName) {
-        await Swal.fire({
-          title: 'Product Already Exists',
-          text: `A product with the name "${productName}" already exists. Please use a different name.`,
-          icon: 'error',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#ef4444',
-          allowOutsideClick: true,
-          willOpen: () => {
-            const container = document.querySelector('.swal2-container') as HTMLElement | null;
-            if (container) container.style.zIndex = '200000';
-          }
-        });
-        return;
-      }
-    } catch (err) {
-      console.error('Failed to check for duplicate names:', err);
-      // If check fails, allow user to proceed (backend will validate)
+
+    // Duplicate names confuse the POS grid, so block them up front.
+    const duplicate = (productsQuery.data ?? []).some(
+      (product) => productName(product).toLowerCase() === newName.trim().toLowerCase()
+    );
+    if (duplicate) {
+      await Swal.fire({
+        title: 'Product already exists',
+        text: `A product named "${newName}" already exists. Please use a different name.`,
+        icon: 'error',
+        confirmButtonColor: '#ef4444',
+        willOpen: swalZIndex,
+      });
+      return;
     }
-    
+
     setSaving(true);
     setSaveError(null);
+
+    const announceSuccess = async () => {
+      resetAddForm();
+      setAddModalOpen(false);
+      notifyProductsChanged();
+      await Swal.fire({
+        title: 'Product added',
+        text: `${newName || 'Product'} was added successfully.`,
+        icon: 'success',
+        showConfirmButton: false,
+        timer: 1400,
+        timerProgressBar: true,
+        willOpen: swalZIndex,
+      });
+    };
+
     try {
-      // optional: get CSRF cookie if using sanctum
-      try { await api.get('/sanctum/csrf-cookie'); } catch (e) { /* ignore if not used */ }
+      try {
+        await api.get('/sanctum/csrf-cookie');
+      } catch {
+        // Not every deployment uses Sanctum cookies.
+      }
 
       const form = new FormData();
-      form.append('product_name', productName);
-      form.append('price', price);
-      
-      form.append('category_id', selectedCategory);
-      // default new products to no-stock state so they show as Out of Stock
+      form.append('product_name', newName);
+      form.append('price', newPrice);
+      form.append('category_id', newCategory);
+      // New products start with no stock so they read as "Out of Stock".
       form.append('status', 'out_of_stock');
       form.append('is_stockable', isStockable ? '1' : '0');
-      if (imageFile) form.append('image', imageFile);
+      if (newImage) form.append('image', newImage);
 
       await api.post('/products', form);
+      await announceSuccess();
+    } catch (error: any) {
+      const response = error?.response;
 
-      // success: close modal, reset form and notify ProductTable to refresh
-      setProductName(''); setPrice(''); setSelectedCategory(''); setImageFile(null);
-      setIsStockable(true);
-      setSaveImageError(null);
-      closeModal();
-      window.dispatchEvent(new CustomEvent('products:refresh'));
-      try {
-        await Swal.fire({
-          title: 'Product Added',
-          text: `${productName || 'Product'} was added successfully.`,
-          icon: 'success',
-          showConfirmButton: false,
-          showCloseButton: false,
-          timer: 1400,
-          timerProgressBar: true,
-          allowOutsideClick: true,
-          willOpen: () => {
-            const container = document.querySelector('.swal2-container') as HTMLElement | null;
-            if (container) container.style.zIndex = '200000';
-          }
-        });
-      } catch (e) {
-        // ignore
-      }
-    } catch (err: any) {
-      const resp = err?.response;
-      // If upload failed because PHP couldn't create a temp file, try a base64 fallback.
-      if (resp && resp.status === 422) {
-        // Normalize server payload: sometimes PHP warnings are injected before JSON
-        let data: any = resp.data || {};
+      // Retry the image as base64 when PHP could not write the upload.
+      if (response?.status === 422 && newImage) {
+        let data: any = response.data ?? {};
         if (typeof data === 'string') {
-          // try to extract JSON body inside the string
-          const idx = data.indexOf('{');
-          if (idx !== -1) {
-            try {
-              data = JSON.parse(data.substring(idx));
-            } catch {
-              data = {};
-            }
-          } else {
-            data = {};
-          }
+          const start = data.indexOf('{');
+          data = start === -1 ? {} : JSON.parse(data.substring(start) || '{}');
         }
-        const imgErr = data?.errors?.image ? String(Array.isArray(data.errors.image) ? data.errors.image.join('; ') : data.errors.image) : '';
-        const serverMsg = String(data?.message || '');
-        const needsFallback = imageFile && (imgErr.toLowerCase().includes('failed to upload') || imgErr.toLowerCase().includes('temporary') || serverMsg.toLowerCase().includes('failed to upload'));
+        const imageMessage = String(
+          Array.isArray(data?.errors?.image) ? data.errors.image.join('; ') : data?.errors?.image ?? ''
+        ).toLowerCase();
+        const serverMessage = String(data?.message ?? '').toLowerCase();
+        const needsFallback =
+          imageMessage.includes('failed to upload') ||
+          imageMessage.includes('temporary') ||
+          serverMessage.includes('failed to upload');
+
         if (needsFallback) {
           try {
-            // Convert image to data url and retry as JSON payload
-            const dataUrl = await fileToDataUrl(imageFile!);
-            const payload: any = {
-              product_name: productName,
-              price: price,
-              category_id: selectedCategory,
+            await api.post('/products', {
+              product_name: newName,
+              price: newPrice,
+              category_id: newCategory,
               status: 'out_of_stock',
               is_stockable: isStockable,
-              image_base64: dataUrl,
-            };
-            await api.post('/products', payload);
-
-            // success: close modal, reset form and notify ProductTable to refresh
-            setProductName(''); setPrice(''); setSelectedCategory(''); setImageFile(null);
-            setIsStockable(true);
-            setSaveImageError(null);
-            closeModal();
-            window.dispatchEvent(new CustomEvent('products:refresh'));
-            try {
-              await Swal.fire({
-                title: 'Product Added',
-                text: `${productName || 'Product'} was added successfully.`,
-                icon: 'success',
-                showConfirmButton: false,
-                showCloseButton: false,
-                timer: 1400,
-                timerProgressBar: true,
-                allowOutsideClick: true,
-                willOpen: () => {
-                  const container = document.querySelector('.swal2-container') as HTMLElement | null;
-                  if (container) container.style.zIndex = '200000';
-                }
-              });
-            } catch (e) { /* ignore */ }
+              image_base64: await fileToDataUrl(newImage),
+            });
+            await announceSuccess();
             return;
-          } catch (fallbackErr: any) {
-            // fallback failed; keep going to original handling
-            console.warn('Base64 fallback failed:', fallbackErr);
+          } catch (fallbackError) {
+            console.warn('Base64 fallback failed:', fallbackError);
           }
         }
       }
 
-      if (resp && resp.status === 422) {
-        const data = resp.data;
-        if (data && data.errors && data.errors.image) {
-          const imgMsg = Array.isArray(data.errors.image) ? data.errors.image.join('; ') : String(data.errors.image);
-          setSaveImageError(imgMsg);
+      if (response?.status === 422) {
+        const data = response.data;
+        if (data?.errors?.image) {
+          setImageError(
+            Array.isArray(data.errors.image) ? data.errors.image.join('; ') : String(data.errors.image)
+          );
         }
-        const msgs = data?.errors ? Object.values(data.errors).flat().join('; ') : data?.message;
-        setSaveError(msgs || err.message || 'Failed to save product');
+        const messages = data?.errors
+          ? Object.values(data.errors).flat().join('; ')
+          : data?.message;
+        setSaveError(messages || error.message || 'Failed to save product');
       } else {
-        setSaveError(err?.response?.data?.message || err.message || 'Failed to save product');
+        setSaveError(response?.data?.message || error.message || 'Failed to save product');
       }
     } finally {
       setSaving(false);
     }
   };
 
+  const restoreProduct = async (product: RawProduct) => {
+    try {
+      await api.patch(`/products/${product.id}/unarchive`);
+      notifyProductsChanged();
+      setArchivedProducts((current) => current.filter((item) => item.id !== product.id));
+      await Swal.fire({
+        title: 'Restored',
+        text: `"${productName(product)}" has been restored.`,
+        icon: 'success',
+        showConfirmButton: false,
+        timer: 1400,
+        timerProgressBar: true,
+        willOpen: swalZIndex,
+      });
+    } catch (error: any) {
+      await Swal.fire({
+        title: 'Error',
+        text: error?.response?.data?.message || 'Failed to restore product',
+        icon: 'error',
+        willOpen: swalZIndex,
+      });
+    }
+  };
+
   return (
     <ProductsErrorBoundary>
-      <>
-      <PageMeta
-        title="Products"
+      <PageMeta title="Stock management" />
+
+      <PageHeader
+        eyebrow="Inventory"
+        title="Stock management"
+        description="Track stock levels, adjust inventory, record damages and manage your catalog."
+        breadcrumbs={[{ label: 'Home', to: '/dashboard' }, { label: 'Stock management' }]}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                productsQuery.refresh();
+                inventoriesQuery.refresh();
+              }}
+              loading={productsQuery.isRefreshing || inventoriesQuery.isRefreshing}
+              startIcon={<RefreshCw className="h-4 w-4" />}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openArchivedModal}
+              startIcon={<Archive className="h-4 w-4" />}
+            >
+              Archived
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setComboModalOpen(true)}
+              startIcon={<Sandwich className="h-4 w-4" />}
+            >
+              Combo meal
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setAddModalOpen(true)}
+              startIcon={<PackagePlus className="h-4 w-4" />}
+            >
+              Add product
+            </Button>
+          </>
+        }
       />
 
-      <PageBreadcrumb
-        pageTitle="Products" />
-
       <div className="space-y-6">
-        <ComponentCard
-          title={
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 w-full">
-              <span>Product List</span>
-              {pageLoading ? (
-                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                  <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  <div className="h-8 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                  <Button size="xs" className="text-md" onClick={openArchivedModal} variant="outline">
-                    📦 Archived
-                  </Button>
-                  <Button size="xs" className="text-md" onClick={() => setIsComboModalOpen(true)} variant="outline">
-                    🍱 Create Combo Meal
-                  </Button>
-                  <Button size="xs" className="text-md" onClick={openModal}>
-                    + Add Product
-                  </Button>
-                </div>
-              )}
-            </div>
+        {showSkeleton ? (
+          <SkeletonStatCards count={4} />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Active products"
+              tone="brand"
+              icon={<Boxes className="h-5 w-5" />}
+              value={formatNumber(stats.total)}
+              hint={`${formatNumber(stats.combos)} combo meal${stats.combos === 1 ? '' : 's'}`}
+            />
+            <StatCard
+              label="Low stock"
+              tone="warning"
+              icon={<AlertTriangle className="h-5 w-5" />}
+              value={formatNumber(stats.lowStock)}
+              hint="10 units or fewer on hand"
+            />
+            <StatCard
+              label="Out of stock"
+              tone="danger"
+              icon={<PackageSearch className="h-5 w-5" />}
+              value={formatNumber(stats.outOfStock)}
+              hint="Needs restocking"
+            />
+            <StatCard
+              label="Inventory value"
+              tone="success"
+              icon={<Wallet className="h-5 w-5" />}
+              value={formatCurrency(stats.stockValue)}
+              hint={`${formatNumber(stats.inStock)} items healthy`}
+            />
+          </div>
+        )}
+
+        <SectionCard
+          title="Product list"
+          description="Search the catalog, then add stock, edit details or record damage."
+          toolbar={
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search products by name, category or status…"
+              className="w-full sm:max-w-md"
+            />
           }
         >
-          {/* Search bar */}
-          {pageLoading ? (
-            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-gray-50 dark:bg-gray-800/30 rounded-lg">
-              <div className="relative w-full sm:w-[360px] h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
-            </div>
-          ) : (
-            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-gray-50 dark:bg-gray-800/30 rounded-lg">
-              <div className="relative w-full sm:w-[360px]">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M19 19l-4.35-4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="9.5" cy="9.5" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
-                </svg>
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(String(e.target.value ?? ""))}
-                  placeholder="Search products by name, category..."
-                  className="w-full pl-10 pr-3 h-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-300"
-                />
-              </div>
-            </div>
-          )}
-
           <ProductTable searchQuery={searchQuery} />
-        </ComponentCard>
+        </SectionCard>
       </div>
 
-      {/* ✅ Modal for Adding Product */}
-      <Modal isOpen={isModalOpen} onClose={closeModal} className="max-w-[700px] m-4">
-        <div className="relative w-full p-4 overflow-y-auto bg-white no-scrollbar rounded-3xl dark:bg-gray-900 lg:p-11">
-          <div className="px-2 pr-14">
-            <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Add New Product
-            </h4>
-            <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-              Add a new product and update your stock here to keep your inventory accurate.
+      {/* Add product */}
+      <Modal isOpen={addModalOpen} onClose={() => setAddModalOpen(false)} className="m-4 max-w-[700px]">
+        <div className="relative w-full rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-10">
+          <div className="pr-12">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add new product</h2>
+            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
+              Create the product now, then add stock from the product list.
             </p>
           </div>
 
-          <form className="flex flex-col" onSubmit={submitProduct}>
-            <div className="px-2 overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                <div>
-                  <Label>Product Name</Label>
-                  <Input
-                    type="text"
-                    placeholder="Enter product name"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
+          <form className="mt-6 flex flex-col" onSubmit={submitProduct}>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
+              <div>
+                <Label>Product name</Label>
+                <Input
+                  type="text"
+                  placeholder="Enter product name"
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label>Category</Label>
+                <Select
+                  options={categoryOptions}
+                  placeholder="Select a category"
+                  onChange={setNewCategory}
+                  className="dark:bg-dark-900"
+                  defaultValue={newCategory}
+                />
+              </div>
+
+              <div>
+                <Label>Price</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={newPrice}
+                  onChange={(event) => setNewPrice(event.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label>Image</Label>
+                <FileInput onChange={handleImageChange} />
+                {imageError && <p className="mt-1 text-xs text-red-500">{imageError}</p>}
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isStockable}
+                    onChange={(event) => setIsStockable(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
                   />
-                </div>
-
-                <div className="col-span-1">
-                  <Label>Select Category</Label>
-                  <Select
-                    options={categories}
-                    placeholder="Select a Category"
-                    onChange={handleSelectChangeInternal}
-                    className="dark:bg-dark-900"
-                    defaultValue={selectedCategory}
-                  />
-                </div>
-
-                <div>
-                  <Label>Price</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter price"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                  />
-                </div>
-
-                {/* Quantity removed: use Add Stock modal to manage inventory */}
-                <div className="col-span-1">
-                  <Label>Image</Label>
-                  <FileInput onChange={handleFileChange} />
-                  {saveImageError && <p className="mt-1 text-xs text-red-500">{saveImageError}</p>}
-                </div>
-
-                <div className="col-span-1 lg:col-span-2">
-                  <div className="flex flex-col gap-3">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isStockable}
-                        onChange={(e) => setIsStockable(e.target.checked)}
-                        className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
-                      />
-                      <div className="flex-col">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Requires Inventory Tracking</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400"><br />Uncheck for unlimited items (e.g., Rice)</span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
+                  <span>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Requires inventory tracking
+                    </span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400">
+                      Uncheck for unlimited items such as rice.
+                    </span>
+                  </span>
+                </label>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>
-                Close
+            {saveError && <p className="mt-4 text-sm text-red-500">{saveError}</p>}
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button size="sm" variant="outline" onClick={() => setAddModalOpen(false)}>
+                Cancel
               </Button>
-              <Button size="sm" type="submit" disabled={saving}>
-                {saving ? 'Saving...' : 'Save Product'}
+              <Button size="sm" type="submit" loading={saving}>
+                Save product
               </Button>
             </div>
-            {saveError && (
-              <p className="text-sm text-red-500 px-4 mt-2">{saveError}</p>
-            )}
           </form>
         </div>
       </Modal>
 
-      {/* Archived Products Modal */}
-      <Modal isOpen={isArchivedModalOpen} onClose={closeArchivedModal} className="max-w-6xl m-4">
-        <div className="relative w-full p-4 overflow-y-auto bg-white no-scrollbar rounded-3xl dark:bg-gray-900 lg:p-11">
-          <div className="px-2 pr-14">
-            <h4 className="mb-6 text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Archived Products
-            </h4>
-            
+      {/* Archived products */}
+      <Modal
+        isOpen={archivedModalOpen}
+        onClose={() => setArchivedModalOpen(false)}
+        className="m-4 max-w-4xl"
+      >
+        <div className="relative w-full rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-10">
+          <div className="pr-12">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Archived products</h2>
+            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
+              Restore a product to make it sellable again.
+            </p>
+          </div>
+
+          <div className="mt-6 max-h-[60vh] overflow-y-auto">
             {archivedLoading ? (
-              <div className="flex justify-center items-center py-12">
-                <p className="text-gray-500">Loading archived products...</p>
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-14 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700/60"
+                  />
+                ))}
               </div>
             ) : archivedProducts.length === 0 ? (
-              <div className="flex justify-center items-center py-12">
-                <p className="text-gray-500">No archived products</p>
-              </div>
+              <EmptyState
+                size="sm"
+                icon={<Archive className="h-6 w-6" />}
+                title="Nothing archived"
+                description="Archived products will be listed here."
+              />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-gray-600 dark:text-gray-400">
-                  <thead className="text-xs font-semibold text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300">
-                    <tr>
-                      <th className="px-4 py-3 text-left">Product Name</th>
-                      <th className="px-4 py-3 text-left">Category</th>
-                      <th className="px-4 py-3 text-left">Price</th>
-                      <th className="px-4 py-3 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {archivedProducts.map((product: any) => (
-                      <tr key={product.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">{product.product_name || product.name}</td>
-                        <td className="px-4 py-3">{typeof product.category === 'string' ? product.category : (product.category?.category_name || product.category?.name || '-')}</td>
-                        <td className="px-4 py-3">₱{Number(product.price || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api.patch(`/products/${product.id}/unarchive`);
-                                window.dispatchEvent(new CustomEvent('products:refresh'));
-                                setArchivedProducts(archivedProducts.filter(p => p.id !== product.id));
-                                try {
-                                  await Swal.fire({
-                                    title: 'Restored',
-                                    text: `"${product.product_name || product.name}" has been restored.`,
-                                    icon: 'success',
-                                    showConfirmButton: false,
-                                    timer: 1400,
-                                    timerProgressBar: true,
-                                    willOpen: () => {
-                                      const container = document.querySelector('.swal2-container') as HTMLElement | null;
-                                      if (container) container.style.zIndex = '200000';
-                                    }
-                                  });
-                                } catch (e) {
-                                  // ignore
-                                }
-                              } catch (err: any) {
-                                try {
-                                  await Swal.fire({
-                                    title: 'Error',
-                                    text: err?.response?.data?.message || 'Failed to restore product',
-                                    icon: 'error',
-                                    willOpen: () => {
-                                      const container = document.querySelector('.swal2-container') as HTMLElement | null;
-                                      if (container) container.style.zIndex = '200000';
-                                    }
-                                  });
-                                } catch (e) {
-                                  // ignore
-                                }
-                              }
-                            }}
-                            className="px-3 py-1 text-sm font-medium text-white bg-green-500 rounded hover:bg-green-600 transition"
-                          >
-                            Restore
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                {archivedProducts.map((product) => (
+                  <li key={product.id} className="flex items-center justify-between gap-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                        {productName(product)}
+                      </p>
+                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                        {categoryLabel(product)} · {formatCurrency(product.price)}
+                      </p>
+                    </div>
+                    <Button size="xs" variant="success" onClick={() => restoreProduct(product)}>
+                      Restore
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
       </Modal>
 
-      {/* Create Combo Meal Modal */}
       <CreateComboMealModal
-        isOpen={isComboModalOpen}
-        onClose={() => setIsComboModalOpen(false)}
-        onSuccess={() => {
-          window.dispatchEvent(new CustomEvent('products:refresh'));
-        }}
+        isOpen={comboModalOpen}
+        onClose={() => setComboModalOpen(false)}
+        onSuccess={notifyProductsChanged}
       />
-      </>
     </ProductsErrorBoundary>
   );
 }
 
-// Development ErrorBoundary for easier debugging of runtime errors on the Products page
-
-class ProductsErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+/** Keeps a render error on this page from blanking the whole admin shell. */
+class ProductsErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { error: null };
@@ -560,20 +582,23 @@ class ProductsErrorBoundary extends React.Component<{ children: React.ReactNode 
     return { error };
   }
 
-  componentDidCatch(error: Error, info: any) {
+  componentDidCatch(error: Error, info: unknown) {
     console.error('Products page error:', error, info);
   }
 
   render() {
     if (this.state.error) {
       return (
-        <div className="p-6">
-          <h2 className="text-lg font-bold text-red-600">An error occurred rendering Products</h2>
-          <pre className="mt-4 whitespace-pre-wrap text-sm text-gray-700">{String(this.state.error && (this.state.error.stack || this.state.error.message))}</pre>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 dark:border-red-500/30 dark:bg-red-500/10">
+          <h2 className="text-base font-semibold text-red-700 dark:text-red-300">
+            Something went wrong rendering Stock management
+          </h2>
+          <pre className="mt-3 whitespace-pre-wrap text-xs text-red-600 dark:text-red-400">
+            {String(this.state.error.stack || this.state.error.message)}
+          </pre>
         </div>
       );
     }
-    return this.props.children;
+    return this.props.children as React.ReactNode;
   }
 }
-

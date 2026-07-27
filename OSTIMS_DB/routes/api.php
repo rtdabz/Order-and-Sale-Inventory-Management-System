@@ -8,28 +8,19 @@ use App\Http\Controllers\AuthController;
 // Authentication (public)
 Route::post('/login', [AuthController::class, 'login']);
 
-// Public read endpoints used by the customer UI (no auth required)
-Route::get('/products', [App\Http\Controllers\ProductController::class, 'index']);
-Route::get('/products/best-sellers', [App\Http\Controllers\ProductController::class, 'bestSellers']);
-Route::get('/inventories', [App\Http\Controllers\InventoryController::class, 'index']);
-Route::get('/categories', [App\Http\Controllers\CategoryController::class, 'index']);
-// Allow guests to place orders (public)
-Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store']);
-// Allow guests to view their own orders by PC number (public)
-Route::get('/orders/by-pc/{pcNumber}', [App\Http\Controllers\OrderController::class, 'getByPcNumber']);
-// Allow guests to view their pending orders by session id (public)
-Route::get('/orders/by-session/{sessionId}', [App\Http\Controllers\OrderController::class, 'getBySession']);
-
-// Public PC session locking endpoints
-Route::post('/pc-session/claim', [App\Http\Controllers\PcSessionController::class, 'claim']);
-Route::post('/pc-session/release', [App\Http\Controllers\PcSessionController::class, 'release']);
-Route::get('/pc-session/locked', [App\Http\Controllers\PcSessionController::class, 'locked']);
-
+// Every other endpoint is staff-only: the POS runs on a single till, so there
+// is no public customer ordering surface and no PC session locking.
 // All other API routes are protected by sanctum auth
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+
+    // Catalog reads (POS terminal, dashboard and reports)
+    Route::get('/products', [App\Http\Controllers\ProductController::class, 'index']);
+    Route::get('/products/best-sellers', [App\Http\Controllers\ProductController::class, 'bestSellers']);
+    Route::get('/inventories', [App\Http\Controllers\InventoryController::class, 'index']);
+    Route::get('/categories', [App\Http\Controllers\CategoryController::class, 'index']);
 
     // Category Routes (write operations protected)
     Route::post('/categories', [App\Http\Controllers\CategoryController::class, 'store']);
@@ -48,10 +39,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/products/{id}/unarchive', [App\Http\Controllers\ProductController::class, 'unarchive']);
     Route::patch('/products/{id}/toggle-best-seller', [App\Http\Controllers\ProductController::class, 'toggleBestSeller']);
 
-    // Order Routes (admin / protected - order listing, confirm, show, update, cancel)
+    // Order Routes — a POS checkout records the order and its sale together,
+    // so there is no separate confirmation step.
+    Route::post('/orders', [App\Http\Controllers\OrderController::class, 'store']);
     Route::get('/orders', [App\Http\Controllers\OrderController::class, 'index']);
     Route::get('/orders/completed', [App\Http\Controllers\OrderController::class, 'completed']);
-    Route::post('/orders/{id}/confirm', [App\Http\Controllers\OrderController::class, 'confirm']);
     Route::get('/orders/{id}', [App\Http\Controllers\OrderController::class, 'show']);
     Route::put('/orders/{id}', [App\Http\Controllers\OrderController::class, 'update']);
     Route::patch('/orders/{id}/cancel', [App\Http\Controllers\OrderController::class, 'cancel']);

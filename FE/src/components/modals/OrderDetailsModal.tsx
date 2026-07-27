@@ -53,11 +53,11 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId, showAction
         {/* Header - stays visible */}
         <div className="px-6 py-4 border-b bg-white dark:bg-gray-900 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold">Order Details</h3>
+            <h3 className="text-lg font-semibold">Transaction Details</h3>
             {order && (
               <div className="flex items-center gap-2">
                 <span className="text-base font-semibold text-gray-600 dark:text-gray-400">
-                  {order.order_alias || `Order #${order.id}`}
+                  {order.transaction_number || `#${order.id}`}
                 </span>
                 {order.sale && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md font-medium text-sm">

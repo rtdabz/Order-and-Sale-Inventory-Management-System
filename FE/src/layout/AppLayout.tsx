@@ -3,12 +3,32 @@ import { Outlet } from "react-router";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
+import { AppDataProvider, useAppData } from "../context/AppDataContext";
+import { AppBootstrapSkeleton } from "../components/ui/skeleton/Skeleton";
+
+/**
+ * Renders the single post-login skeleton, then hands over to the routed page.
+ *
+ * Pages are intentionally not mounted until the initial prefetch resolves: by
+ * the time they render, the shared cache already holds products, inventories,
+ * categories and orders, so no page shows a skeleton of its own and navigation
+ * is instant.
+ */
+const PageArea: React.FC = () => {
+  const { bootstrapped } = useAppData();
+
+  return (
+    <div id="main-content" className="mx-auto max-w-screen-2xl p-4 md:p-6">
+      {bootstrapped ? <Outlet /> : <AppBootstrapSkeleton />}
+    </div>
+  );
+};
 
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
   return (
-    <div className="min-h-screen xl:flex bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 xl:flex">
       <div>
         <AppSidebar />
         <Backdrop />
@@ -19,9 +39,7 @@ const LayoutContent: React.FC = () => {
         } ${isMobileOpen ? "ml-0" : ""}`}
       >
         <AppHeader />
-        <div id="main-content" className="p-4 mx-auto max-w-screen-2xl md:p-6">
-          <Outlet />
-        </div>
+        <PageArea />
       </div>
     </div>
   );
@@ -29,9 +47,11 @@ const LayoutContent: React.FC = () => {
 
 const AppLayout: React.FC = () => {
   return (
-    <SidebarProvider>
-      <LayoutContent />
-    </SidebarProvider>
+    <AppDataProvider>
+      <SidebarProvider>
+        <LayoutContent />
+      </SidebarProvider>
+    </AppDataProvider>
   );
 };
 

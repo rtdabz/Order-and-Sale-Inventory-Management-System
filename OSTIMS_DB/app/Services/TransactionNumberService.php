@@ -8,57 +8,36 @@ use Carbon\Carbon;
 class TransactionNumberService
 {
     /**
-     * Generate a transaction number in the format:
-     * For PC orders: MMTTJJ-PC##-SEQ##
-     * For Walk-In: MMTTJJ-WI-SEQ##
-     * MMTTJJ = German style date: Month, Day, Year (e.g., 121225 for December 12, 2025)
-     * PC## = PC number (zero-padded to 2 digits)
-     * SEQ## = Sequential number for this day (zero-padded to 2 digits)
+     * Build a receipt number for a POS sale.
      *
-     * @param string|int $pcNumber The PC station number or "WI" for walk-in
-     * @return string
+     * Format: MMDDYY-SEQ##
+     *   MMDDYY = date the sale was rung up (e.g. 072726 for 27 July 2026)
+     *   SEQ##  = sequence within that calendar day, restarting at 01 each day
+     *
+     * The system runs on one till, so the number no longer carries a station
+     * component.
      */
-    public static function generateTransactionNumber($pcNumber): string
+    public static function generate(): string
     {
         $now = Carbon::now();
-        
-        // Get sequential number for this day
-        $seqNumber = self::getSequentialNumber($now);
-        $seq = str_pad($seqNumber, 2, '0', STR_PAD_LEFT);
-        
-        // MMTTJJ format (German style: month + day + year, all 2 digits)
-        $mmttjj = $now->format('mdy');  // e.g., 121225 for Dec 12, 2025
-        
-        // Check if it's a walk-in order
-        if (strtoupper($pcNumber) === 'WI' || $pcNumber === 'PC-WI') {
-            return "{$mmttjj}-WI-SEQ{$seq}";
-        }
-        
-        // Pad PC number to 2 digits
-        $pc = str_pad($pcNumber, 2, '0', STR_PAD_LEFT);
-        
-        return "{$mmttjj}-PC{$pc}-SEQ{$seq}";
+        $sequence = str_pad((string) self::nextSequence($now), 2, '0', STR_PAD_LEFT);
+
+        return "{$now->format('mdy')}-SEQ{$sequence}";
     }
-    
+
     /**
-     * Get the sequential number for orders created today
-     * Resets to 1 at the start of each new day
+     * Next sequence number for the given day.
      *
-     * @param Carbon $date
-     * @return int
+     * Counts orders already numbered today, so the value resets naturally at
+     * midnight.
      */
-    private static function getSequentialNumber(Carbon $date): int
+    private static function nextSequence(Carbon $date): int
     {
-        $startOfDay = $date->clone()->startOfDay();
-        $endOfDay = $date->clone()->endOfDay();
-        
-        // Count orders created today only (excluding those without transaction_number yet)
-        $count = Order::whereBetween('created_at', [$startOfDay, $endOfDay])
-                     ->whereNotNull('transaction_number')
-                     ->count();
-        
-        // Return the next sequence number (count + 1)
-        // This automatically resets to 1 at the start of each new day
-        return $count + 1;
+        return Order::whereBetween('created_at', [
+            $date->clone()->startOfDay(),
+            $date->clone()->endOfDay(),
+        ])
+            ->whereNotNull('transaction_number')
+            ->count() + 1;
     }
 }

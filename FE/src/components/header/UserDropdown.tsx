@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNavigate } from "react-router";
 import api from "../../lib/axios";
+import { resetAppData } from "../../context/AppDataContext";
 import { toast } from 'sonner';
 
 export default function UserDropdown() {
@@ -87,6 +88,13 @@ export default function UserDropdown() {
             // Clear order context by dispatching an event
             try {
               window.dispatchEvent(new CustomEvent('orders:clear'));
+            } catch {
+              // ignore
+            }
+            // Drop every cached dataset so the next login starts clean and
+            // runs its one-time initial load again.
+            try {
+              resetAppData();
             } catch {
               // ignore
             }
