@@ -22,7 +22,7 @@ export type BrandLockupProps = {
 const BrandLockup: React.FC<BrandLockupProps> = ({ showWordmark, className, wordmarkClassName }) => (
   <Link
     to={DASHBOARD_PATH}
-    aria-label="MKB, go to dashboard"
+    aria-label="CyberPOS, go to dashboard"
     className={cn(
       "flex items-center gap-3 rounded-lg outline-none",
       "focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
@@ -33,14 +33,14 @@ const BrandLockup: React.FC<BrandLockupProps> = ({ showWordmark, className, word
   >
     <img
       src="/images/logo/MKB.jpg"
-      alt="MKB logo"
+      alt="CyberPOS logo"
       width={50}
       height={50}
       className="rounded-lg border border-brand-900/50"
     />
     {showWordmark && (
       <span className={cn("text-2xl font-semibold text-gray-800 dark:text-white", wordmarkClassName)}>
-        MKB
+        CyberPOS
       </span>
     )}
   </Link>

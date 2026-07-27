@@ -54,13 +54,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="flex items-center gap-3">
             <img
               src="/images/logo/MKB.jpg"
-              alt="MKB logo"
+              alt="CyberPOS logo"
               width={52}
               height={52}
               className="rounded-xl shadow-lg ring-1 ring-white/20"
             />
             <div>
-              <p className="text-xl font-bold leading-tight text-white">MKB</p>
+              <p className="text-xl font-bold leading-tight text-white">CyberPOS</p>
               <p className="text-xs uppercase tracking-[0.2em] text-white/60">Point of Sale</p>
             </div>
           </div>
@@ -93,7 +93,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <p className="text-xs text-white/40">
-            © {new Date().getFullYear()} MKB · Order and Sales Inventory Management System
+            © {new Date().getFullYear()} CyberPOS · Order and Sales Inventory Management System
           </p>
         </div>
       </aside>

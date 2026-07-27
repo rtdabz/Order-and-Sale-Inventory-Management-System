@@ -82,11 +82,11 @@ const Header: React.FC<HeaderProps> = ({ onClick, onToggle }) => {
             <img
               className="dark:hidden rounded-lg"
               src="/images/logo/MKB.jpg"
-              alt="MKB logo"
+              alt="CyberPOS logo"
               width={50}
               height={50}
             />
-            <span className="font-semibold text-2xl text-gray-800 dark:text-gray-900">MKB</span>
+            <span className="font-semibold text-2xl text-gray-800 dark:text-gray-900">CyberPOS</span>
           </Link>
 
           <button

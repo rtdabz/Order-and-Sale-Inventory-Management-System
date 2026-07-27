@@ -58,11 +58,11 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({
         <div className="flex items-center justify-center gap-3">
           <img
             src="/images/logo/MKB.jpg"
-            alt="MKB logo"
+            alt="CyberPOS logo"
             style={{ height: '40px', width: '40px' }}
             className="object-contain"
           />
-          <h1 className="text-2xl font-bold tracking-widest text-gray-900">MKB</h1>
+          <h1 className="text-2xl font-bold tracking-widest text-gray-900">CyberPOS</h1>
         </div>
         <p className="text-xs uppercase tracking-wider text-gray-500">Sales receipt</p>
       </div>

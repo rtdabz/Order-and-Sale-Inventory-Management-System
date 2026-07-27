@@ -96,13 +96,13 @@ export default function SignInForm() {
         <div className="mb-7 flex items-center gap-3 lg:hidden">
           <img
             src="/images/logo/MKB.jpg"
-            alt="MKB logo"
+            alt="CyberPOS logo"
             width={44}
             height={44}
             className="rounded-xl shadow-sm"
           />
           <div>
-            <p className="text-lg font-bold leading-tight text-gray-900 dark:text-white">MKB</p>
+            <p className="text-lg font-bold leading-tight text-gray-900 dark:text-white">CyberPOS</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">Point of Sale</p>
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function SignInForm() {
       </div>
 
       <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
-        MKB Order and Sales Inventory Management System
+        CyberPOS Order and Sales Inventory Management System
       </p>
     </div>
   );
